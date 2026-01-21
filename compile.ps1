@@ -1,0 +1,1 @@
+pyinstaller --noconsole --onefile --name WT_Copilot --icon icon.ico --add-data "sounds;sounds" --add-data "settings.json;." code/main.py

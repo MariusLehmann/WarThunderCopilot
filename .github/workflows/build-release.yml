@@ -1,0 +1,135 @@
+name: Build and Release WT Copilot
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write  # notwendig, um Releases zu erstellen
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # 1️⃣ Repository auschecken
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Python installieren
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check files
+        shell: powershell
+        run: |
+            ls .
+            ls sounds
+            ls icon.ico
+
+
+      # 3️⃣ Pip-Cache für schnellere Builds
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      # 4️⃣ Abhängigkeiten installieren
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller requests
+
+      # 5️⃣ Anwendung bauen
+      - name: Build EXE with PyInstaller
+        shell: powershell
+        run: |
+          # Sicherheitshalber prüfen, ob die Zusatzdateien existieren
+          if (-not (Test-Path "sounds")) { Write-Error "sounds directory not found" }
+
+          # PyInstaller-Build mit robusten Import-Hinweisen
+          pyinstaller --onefile `
+            --noconsole `
+            --name WT_Copilot `
+            --icon icon.ico `
+            --add-data "sounds;sounds" `
+            --add-data "icon.ico;." `
+            --hidden-import=imagehash `
+            --hidden-import=simplejson `
+            --hidden-import=PIL `
+            --hidden-import=PIL.Image `
+            --hidden-import=PIL.ImageFile `
+            --hidden-import=PIL._imaging `
+            --hidden-import=numpy `
+            --hidden-import=requests `
+            --hidden-import=hashlib `
+            --hidden-import=pygame `
+            code/main.py
+
+    #   # 6️⃣ Build-Output verpacken
+    #   - name: Package build
+    #     shell: powershell
+    #     run: |
+    #       cd dist
+    #       Compress-Archive WT_Copilot.exe WT_Copilot_Windows.zip
+
+      # 7️⃣ Datumsversion mit Unternummer generieren
+      - name: Generate date-based version
+        id: version
+        shell: python
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          import os, requests
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+          headers = {'Authorization': f'token {token}'}
+          base_tag = 'v' + __import__('datetime').datetime.now().strftime('%Y-%m-%d')
+
+          # GitHub API: vorhandene Tags prüfen
+          url = f'https://api.github.com/repos/{repo}/tags'
+          r = requests.get(url, headers=headers)
+          r.raise_for_status()
+          tags = [t['name'] for t in r.json() if t['name'].startswith(base_tag)]
+
+          if tags:
+              # Unterversion bestimmen
+              suffix = 1
+              while f"{base_tag}.{suffix}" in tags:
+                  suffix += 1
+              final_tag = f"{base_tag}.{suffix}"
+          else:
+              final_tag = base_tag
+
+          print(f"TAG_NAME={final_tag}")
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f"TAG_NAME={final_tag}\n")
+
+      # 8️⃣ Release erstellen oder aktualisieren
+      - name: Create or update GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: "WT Copilot Release ${{ env.TAG_NAME }}"
+          draft: false
+          prerelease: false
+          files: dist/WT_Copilot.exe
+          allow_updates: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 9️⃣ Optional: Artefakt hochladen
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: WT_Copilot_EXE
+      #     path: dist/WT_Copilot.exe
