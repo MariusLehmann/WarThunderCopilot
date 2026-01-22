@@ -1,0 +1,61 @@
+name: Run Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - Release_Candidate
+  pull_request:
+    branches:
+      - main
+      - Release_Candidate
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # 2️⃣ Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      # 3️⃣ Cache pip dependencies
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      # 4️⃣ Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install only the dependencies needed for testing
+          pip install pytest pytest-cov
+          pip install darkdetect simplejson requests PyQtDarkTheme2 pillow imagehash
+      
+      # 5️⃣ Run tests
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --tb=short
+      
+      # 6️⃣ Generate coverage report
+      - name: Generate coverage report
+        run: |
+          python -m pytest tests/ --cov=code --cov-report=term --cov-report=html
+      
+      # 7️⃣ Upload coverage report as artifact
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 7
