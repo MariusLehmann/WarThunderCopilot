@@ -1,4 +1,4 @@
-name: Build and Release WT Copilot
+name: Beta build
 
 on:
   push:
