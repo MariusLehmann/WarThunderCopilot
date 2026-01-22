@@ -30,13 +30,16 @@ This will generate a coverage report in the terminal and create an HTML coverage
 #### Run Specific Test Files
 
 ```bash
-# Test only mapinfo module
-pytest tests/test_mapinfo.py -v
+# Test backend settings module
+pytest tests/test_settings.py -v
 
-# Test only models
-pytest tests/test_models.py -v
+# Test backend warning engine
+pytest tests/test_warningengine.py -v
 
-# Test only wtFetcher module
+# Test backend sound engine
+pytest tests/test_soundengine.py -v
+
+# Test backend telemetry fetcher
 pytest tests/test_wtfetcher.py -v
 ```
 
