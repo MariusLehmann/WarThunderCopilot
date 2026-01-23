@@ -46,6 +46,7 @@ jobs:
           # which requires portaudio system libraries that are not available in CI
           pip install pytest pytest-cov
           pip install darkdetect simplejson requests PyQtDarkTheme2 pillow imagehash
+          pip install PySide6 pygame tinydb
       
       # 5️⃣ Run tests
       - name: Run unit tests
