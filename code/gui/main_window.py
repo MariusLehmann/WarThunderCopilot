@@ -3,6 +3,7 @@ from PySide6.QtGui import QAction, QIcon, QActionGroup
 from PySide6.QtCore import Qt
 
 import sys
+import os
 import darkdetect
 import qdarktheme
 from logging_setup import get_logger
@@ -246,7 +247,7 @@ class MainWindow(QMainWindow):
             ES_SYSTEM_REQUIRED = 0x00000001
             ES_DISPLAY_REQUIRED = 0x00000002
             ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)
-        elif sys.plattform.startswith('linux'):
+        elif sys.platform.startswith('linux'):
             import subprocess
             if os.system("command -v systemd-inhibit > /dev/null") == 0:
                 try:
@@ -264,7 +265,7 @@ class MainWindow(QMainWindow):
             import ctypes
             ES_CONTINUOUS = 0x80000000
             ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
-        elif sys.plattform.startswith('linux'):
+        elif sys.platform.startswith('linux'):
             import subprocess
             if self.__inhibit_process:
                 try:
