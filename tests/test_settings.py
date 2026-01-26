@@ -23,8 +23,8 @@ class TestGeneralSettings:
     def test_general_settings_defaults(self):
         """Test GeneralSettings default values"""
         settings = GeneralSettings()
-        assert settings.ip == "0.0.0.0"
-        assert settings.intervall == 500
+        assert settings.ip == "127.0.0.1"
+        assert settings.intervall == 100
         assert settings.theme == Theme.AUTO
     
     def test_general_settings_custom(self):
@@ -90,7 +90,7 @@ class TestGlobalSettings:
         settings = GlobalSettings()
         assert isinstance(settings.general, GeneralSettings)
         assert isinstance(settings.warning, WarningSettings)
-        assert settings.general.ip == "0.0.0.0"
+        assert settings.general.ip == "127.0.0.1"
         assert settings.warning.speed_treshold == 90.0
     
     def test_global_settings_custom(self):
@@ -110,7 +110,7 @@ class TestGlobalSettings:
         
         assert "general" in result
         assert "warning" in result
-        assert result["general"]["ip"] == "0.0.0.0"
+        assert result["general"]["ip"] == "127.0.0.1"
         assert result["warning"]["speed_treshold"] == 90.0
     
     def test_global_settings_from_dict(self):
@@ -157,5 +157,5 @@ class TestGlobalSettings:
         settings = GlobalSettings.from_dict(data)
         # Should use provided IP but defaults for other values
         assert settings.general.ip == "172.16.0.1"
-        assert settings.general.intervall == 500  # default
+        assert settings.general.intervall == 100  # default
         assert settings.warning.speed_treshold == 90.0  # default
