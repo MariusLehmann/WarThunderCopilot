@@ -3,19 +3,17 @@ Unit tests for wtFetcher module - testing telemetry data parsing
 """
 import pytest
 import sys
-from pathlib import Path
-
-# Add code directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / 'code'))
-
-from backend.wtFetcher import (
+from ..code.backend.wtFetcher import (
     TelemetryData, 
     WTUpdater, 
     TelemetryNotFoundException,
     TELEMETRY_INFORMATION,
     OPTIONAL_TELEMETRY
 )
+from pathlib import Path
 
+# Add code directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / 'code'))
 
 class TestTelemetryData:
     """Test the TelemetryData dataclass"""
