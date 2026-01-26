@@ -3,7 +3,7 @@ Unit tests for wtFetcher module - testing telemetry data parsing
 """
 import pytest
 import sys
-from ..code.backend.wtFetcher import (
+from backend.wtFetcher import (
     TelemetryData, 
     WTUpdater, 
     TelemetryNotFoundException,
