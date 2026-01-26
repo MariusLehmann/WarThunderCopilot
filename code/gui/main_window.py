@@ -13,7 +13,6 @@ from Models import Theme
 from gui.base_elements import BasicDockWidget
 from Packages.Models.Plane import WTPlane
 from Packages.local_db import LocalDB
-from Packages import SettingsCollection
 
 from gui.status_widget import AircraftStatusDock
 from gui.info_widget import InfoDockWidget
@@ -47,16 +46,14 @@ class ModuleDock(BasicDockWidget):
 
 class MainWindow(QMainWindow):
     __inhibit_process = None
-    __settings:SettingsCollection
     __global_settings:GlobalSettings
     _default_sound_box:SoundBox
     _priority_sound_box:SoundBox
     __current_theme:Theme
     
-    def __init__(self, settings:SettingsCollection):
+    def __init__(self):
         super().__init__()
-        self.__settings = settings # TODO: Think of a way to init without settings given
-        
+                
         self.__set_prevent_device_sleep()
         self.setDockOptions(QMainWindow.DockOption.AllowNestedDocks | QMainWindow.DockOption.AllowTabbedDocks | QMainWindow.DockOption.AnimatedDocks | QMainWindow.DockOption.GroupedDragging)
         
@@ -65,9 +62,9 @@ class MainWindow(QMainWindow):
         
         self.db = LocalDB()
         self.__global_settings = GlobalSettings.from_dict(self.db.get_global_settings())
-        self.updater = WTUpdater(settings.ip, DEBUG_MODE)
+        self.updater = WTUpdater(self.__global_settings.general.ip, DEBUG_MODE)
         self.own_plane:WTPlane|None = None
-        self.update_interval = settings.intervall
+        self.update_interval = self.__global_settings.general.intervall
         self.error_intervall = 5000
         self.worker_had_error = False
         
@@ -118,7 +115,7 @@ class MainWindow(QMainWindow):
             self.restoreState(saved_layout)
             
         # Setup backend Worker
-        self.init_worker(settings.ip, DEBUG_MODE, self.update_interval, self.error_intervall)
+        self.init_worker(self.__global_settings.general.ip, DEBUG_MODE, self.update_interval, self.error_intervall)
         # Setup warning module
         self.init_warning_modules()
         
@@ -339,6 +336,3 @@ class MainWindow(QMainWindow):
         self.theme_dark.triggered.connect(lambda: self.__set_theme(Theme.DARK))
 
         self.__set_theme(self.__global_settings.general.theme)
-        
-        
-            
