@@ -9,8 +9,8 @@ from Packages.settings_collection import SettingsCollection
 class GeneralSettings:
     """Settings For the Whole Programm
     """
-    ip: str = "0.0.0.0"
-    intervall: int = 500
+    ip: str = "127.0.0.1"
+    intervall: int = 100
     theme: Theme = Theme.AUTO
     
     def to_dict(self):

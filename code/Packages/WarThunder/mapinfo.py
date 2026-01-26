@@ -519,7 +519,7 @@ class MapInfo(object):
             print('ERROR: could not download map.jpg')
     
         except (OSError, JSONDecodeError, simpleJSONDecodeError):
-            print('Waiting to join a match')
+            print('Waiting to join a match') # TODO: Das wird dauernd aufgerufen
             sleep(1)
             
         except ReadTimeout:

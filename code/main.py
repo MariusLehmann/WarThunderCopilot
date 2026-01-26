@@ -1,9 +1,5 @@
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
-
-
-
-from gui.settings_window import SettingsDialog
 from gui.main_window import MainWindow
 
 
@@ -16,15 +12,10 @@ def main():
     app = QApplication([])
     app.setWindowIcon(QIcon("icon.ico"))
 
-    dialog = SettingsDialog()
-    if dialog.exec():
-        settings = dialog.get_settings()
-        # Theme direkt setzen
-        settings.apply_theme()
-        
-        window = MainWindow(settings)
-        window.show()
-        app.exec()
+    main_window = MainWindow()
+    main_window.show()
+    app.exec()
+    
 
 def test():
     # i = 0 
