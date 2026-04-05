@@ -47,7 +47,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller requests
 
-      # 5️⃣ Anwendung bauen
+      # 5️⃣ Tests ausführen
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+      # 6️⃣ Anwendung bauen
       - name: Build EXE with PyInstaller
         shell: powershell
         run: |
@@ -73,14 +78,14 @@ jobs:
             --hidden-import=pygame `
             code/main.py
 
-    #   # 6️⃣ Build-Output verpacken
+    #   # 7️⃣ Build-Output verpacken
     #   - name: Package build
     #     shell: powershell
     #     run: |
     #       cd dist
     #       Compress-Archive WT_Copilot.exe WT_Copilot_Windows.zip
 
-      # 7️⃣ Datumsversion mit Unternummer generieren
+      # 8️⃣ Datumsversion mit Unternummer generieren
       - name: Generate date-based version
         id: version
         shell: python
@@ -113,7 +118,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a') as f:
               f.write(f"TAG_NAME={final_tag}\n")
 
-      # 8️⃣ Release erstellen oder aktualisieren
+      # 9️⃣ Release erstellen oder aktualisieren
       - name: Create or update GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -127,7 +132,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 9️⃣ Optional: Artefakt hochladen
+      # 🔟 Optional: Artefakt hochladen
       # - name: Upload artifact
       #   uses: actions/upload-artifact@v4
       #   with:
