@@ -73,6 +73,10 @@ class SoundBox:
     def clear_queue(self) -> None:
         """Clear all sounds from the play loop."""
         self._queue.clear()
+
+    def reload_sound_settings(self) -> None:
+        """Reload sound/volume mappings used for playback from persistent storage."""
+        self._queue.reload_sound_manager()
         
     def stop(self, wait: bool = False) -> None:
         """Stop the SoundBox and its internal thread.

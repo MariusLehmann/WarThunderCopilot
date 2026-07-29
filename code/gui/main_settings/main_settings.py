@@ -192,6 +192,7 @@ class SettingsWindow(QDialog):
                 self.warning_settings_changed.emit(self._settings_obj.warning)
             
             if self.sounds_tab.has_changes():
+                self.sounds_tab.save_changes()
                 self.sound_settings_changed.emit()
             return True
         return False

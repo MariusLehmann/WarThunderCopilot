@@ -51,7 +51,14 @@ class SoundManager:
         self.volume_mapping = data.get("volume_mapping", {})
         # master volume as float between 0.0 and 1.0
         self.master_volume = float(data.get("master_volume", 1.0))
-        
+
+    def reload(self) -> None:
+        """Reload sound mapping, volume mapping and master volume from persistent storage."""
+        data = DB.get_dict(LOCAL_DB_NAME, default={})
+        self.sound_mapping = data.get("sound_mapping", {})
+        self.volume_mapping = data.get("volume_mapping", {})
+        self.master_volume = float(data.get("master_volume", 1.0))
+
     def _save_mappings(self) -> None:
         DB.save_dict({
             "sound_mapping": self.sound_mapping,
@@ -161,7 +168,12 @@ class SoundQueue:
             self._sound_manager = sound_manager
         else:
             self._sound_manager = SoundManager()
-        
+
+    def reload_sound_manager(self) -> None:
+        """Reload the underlying SoundManager's mappings from persistent storage."""
+        with self._cond:
+            self._sound_manager.reload()
+
     def add_sound(self, sound:Sound, disable_periodic:bool = False) -> None:
         """Add a Sound to the queue for immediate playback.
         

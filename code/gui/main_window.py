@@ -202,11 +202,17 @@ class MainWindow(QMainWindow):
         settings_window.settings_saved.connect(self._on_settings_saved)
         settings_window.general_settings_changed.connect(self._on_general_settings_change)
         settings_window.warning_settings_changed.connect(self._plane_speed_warning_e.on_new_threshold_settings)
-        
+        settings_window.sound_settings_changed.connect(self._reload_sound_settings)
+
         self._pause_all_workers()
         settings_window.exec()
         self._resume_all_workers()
     
+    def _reload_sound_settings(self):
+        """Reload sound/volume mappings for the main sound players after sound settings changed."""
+        self._default_sound_box.reload_sound_settings()
+        self._priority_sound_box.reload_sound_settings()
+
     def _on_settings_saved(self, settings):
         """Update the settings reference in the Window after settings where saved.
         
