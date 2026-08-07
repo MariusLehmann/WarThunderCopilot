@@ -15,9 +15,11 @@ from pathlib import Path
 import shutil
 import pygame
 
-from backend.SoundEngine import sounds as sounds_module
-from backend.SoundEngine.general import Sound, SoundManager
-from backend.SoundEngine.soundBox import SoundBox
+from backend.settings import SoundSettings
+
+from backend.oldSoundEngine import sounds as sounds_module
+from backend.oldSoundEngine.general import Sound, SoundManager
+from backend.oldSoundEngine.soundBox import SoundBox
 from paths import SOUNDS_DIR, USER_SOUNDS_DIR
 
 
@@ -193,6 +195,11 @@ class SoundSettingsTab(SettingsTab):
         """Saves current sound settings to the SoundManager."""
         self._sound_manager._save_mappings()
         self._has_changes = False
+        
+    def get_settings(self) -> SoundSettings:
+        """Returns the current SoundManager settings."""
+        return SoundSettings() # TODO hier muss noch das anpassen und einstellen an die neue Engine gebunden werden
+        
 
 class PlayButton(QPushButton):
     def __init__(self, sound:Sound, sound_box:SoundBox, parent=None) -> None:

@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from gui.base_elements import SelectableLabel, Lamp
 
-from Packages.Models.Plane import WTPlane, TelemetryData
+from Packages.Models.Plane import Plane, TelemetryData
 
 class FlapValueException(ValueError):
     pass

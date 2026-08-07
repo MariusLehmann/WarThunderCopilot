@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-DEBUG_MODE = False
+DEBUG_MODE = False  # Set to False for production
 
 # keep legacy DB_PATH behaviour
 PATH = Path(os.path.abspath(__file__)).parent

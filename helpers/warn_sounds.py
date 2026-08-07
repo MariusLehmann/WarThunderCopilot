@@ -62,7 +62,7 @@ if __name__ == "__main__":
     
     beep_pattern = [
         (800, 0.1, 0.0, 'sine'),
-        (1000, 0.1, 0.0, 'sine')
+        (500, 0.1, 0.0, 'sine'),
     ] * 1
 
     save_beep_sequence(beep_pattern, "info_beep.wav")

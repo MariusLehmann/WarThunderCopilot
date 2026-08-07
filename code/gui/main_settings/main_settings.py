@@ -42,20 +42,25 @@ class SettingsWindow(QDialog):
     _changes_detected: bool = False
     _original_settings: GlobalSettings
     _settings_obj: GlobalSettings
-    
+
+    # Reihenfolge der Tabs, wie sie in _init_ui angelegt werden.
+    TAB_GENERAL = 0
+    TAB_WARNINGS = 1
+    TAB_SOUNDS = 2
+
     # Signals
     general_settings_changed = Signal(GeneralSettings)
     warning_settings_changed = Signal(WarningSettings)
     sound_settings_changed = Signal()  # TODO: SoundSettings mit übergeben
     settings_saved = Signal(object)  # Signal wird mit Settings-Objekt emittiert
-    
-    
-    def __init__(self, parent=None, settings=None):
+
+
+    def __init__(self, parent=None, settings=None, initial_tab: int = TAB_GENERAL):
         super().__init__(parent)
         self.setWindowTitle("Einstellungen")
         self.setModal(True)
         self.resize(600, 400)
-        
+
         # Original Settings für Änderungserkennung
         if isinstance(settings, GlobalSettings):
             self._original_settings = settings
@@ -63,9 +68,10 @@ class SettingsWindow(QDialog):
             self._original_settings = GlobalSettings.from_settingsCollection(settings)
         else:
             raise ValueError("Ungültiger Typ für Einstellungen")
-        
+
         self._init_ui()
         self._load_settings()
+        self.tab_widget.setCurrentIndex(initial_tab)
         
     def _load_settings(self):
         """Lädt gespeicherte Einstellungen in die UI-Elemente.
@@ -162,7 +168,7 @@ class SettingsWindow(QDialog):
         settings = GlobalSettings(
             general=self.general_tab.get_settings(),
             warning=self.warnings_tab.get_settings(),
-            # sound=None  # TODO: Sound settings in den RAM kopieren
+            sound=self.sounds_tab.get_settings()
         )
         self._settings_obj = settings
         return settings

@@ -8,21 +8,24 @@ import darkdetect
 import qdarktheme
 from logging_setup import get_logger
 
+from typing import Protocol
+
 from Models import Theme
 
 from gui.base_elements import BasicDockWidget
-from Packages.Models.Plane import WTPlane
+from Packages.Models.Plane import Plane
 from Packages.local_db import LocalDB
 
 from gui.status_widget import AircraftStatusDock
 from gui.info_widget import InfoDockWidget
 from gui.main_settings import SettingsWindow
 
-from backend.wtFetcher import WTUpdater
-from backend.worker import dataFetcher
+from backend.worker import PlaneUpdateWorker
 from backend.warningEngine import PlaneSpeedWarningEngine
-from backend.SoundEngine import Sound, SoundBox
-
+from backend.oldSoundEngine import Sound, SoundBox
+from backend.SoundEngine import SoundEngine
+from backend.main_worker import MainWorker
+from backend.information_engine import AcousticInformationEngine
 from settings import DEBUG_MODE
 
 # For References 
@@ -42,9 +45,257 @@ class ModuleDock(BasicDockWidget):
     
     def _update_window(self) -> None:
         pass
-
+    
+class Worker(Protocol):
+    def start(self) -> None:
+        ...
+    def stop(self) -> None:
+        ...
+    def pause(self) -> None:
+        ...
+    def resume(self) -> None:
+        ...
 
 class MainWindow(QMainWindow):
+    _db: LocalDB
+    _global_settings: GlobalSettings
+    _workers: set[Worker]
+    _main_worker: MainWorker
+    _information_engine: AcousticInformationEngine
+    _sound_engine: SoundEngine
+    
+    
+    def __init__(self):
+        super().__init__()
+        self._workers = set()
+        self.__set_prevent_device_sleep()
+        self.setWindowTitle("WTCopilot")
+        self.setWindowIcon(QIcon("icon.ico"))
+        self.resize(900, 600)
+        
+        central = QLabel(f"War Thunder - Copilot")
+        central.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setCentralWidget(central)
+        
+        self.setDockOptions(QMainWindow.DockOption.AllowNestedDocks | QMainWindow.DockOption.AllowTabbedDocks | QMainWindow.DockOption.AnimatedDocks | QMainWindow.DockOption.GroupedDragging)
+        
+        self._sound_engine = SoundEngine()
+        
+        self.__init_settings()
+        self.__init_main_worker()
+        self.__init_information_engine()
+        # self.__init_modules() # TODO: reactivate
+        
+        # Theme-Umschalter
+        self.__init_theme_menu()
+
+        # Einstellungen-Menü
+        self.settings_menu = self.menuBar().addMenu("Einstellungen")
+        for label, tab_index in (
+            ("Allgemein", SettingsWindow.TAB_GENERAL),
+            ("Warnungen", SettingsWindow.TAB_WARNINGS),
+            ("Sounds", SettingsWindow.TAB_SOUNDS),
+        ):
+            action = QAction(label, self)
+            action.triggered.connect(lambda checked=False, idx=tab_index: self._open_settings_window(idx))
+            self.settings_menu.addAction(action)
+
+        # Layout wiederherstellen
+        saved_layout = self._db.get_layout()
+        if saved_layout:
+            self.restoreState(saved_layout)
+        
+        self._main_worker.start()
+        
+    def __init_settings(self):
+        self._db = LocalDB()
+        self._global_settings = GlobalSettings.from_dict(self._db.get_global_settings())
+    
+    def __init_main_worker(self):
+        self._main_worker = MainWorker(
+            endpoint_ip=self._global_settings.general.ip,
+            api_url= "https://api.wtc.mariuslehmann.de", # TODO: Make this configurable in the settings and implement usage in Backend
+            interval_ms=self._global_settings.general.intervall,
+            debug_mode=DEBUG_MODE
+        )
+        self._workers.add(self._main_worker)
+    
+    def __init_information_engine(self):
+        assert self._main_worker is not None, "Main Worker must be initialized before Information Engine."
+        
+        self._information_engine = AcousticInformationEngine()
+    
+        self._main_worker.S_NewPlane.connect(self._information_engine.on_new_telemetry_or_plane)
+        self._main_worker.S_TelUpdate.connect(self._information_engine.on_new_telemetry_or_plane)
+        self._main_worker.S_NoPlane.connect(self._information_engine.on_no_plane)
+        
+        self._information_engine.S_NewInformationSounds.connect(self._sound_engine.on_new_information_sounds)
+        
+        
+    def __init_modules(self):
+        self.modules = {
+            # "Modul A": ModuleDock("Modul A", "Inhalt von Modul A"),
+            "Plane Information": InfoDockWidget(self),
+            "Status": AircraftStatusDock("Flugzeug Status", self)
+        }
+        self.std_pos = {
+            # "Modul A": Qt.DockWidgetArea.RightDockWidgetArea,
+            "Plane Information": Qt.DockWidgetArea.RightDockWidgetArea,
+            "Status": Qt.DockWidgetArea.BottomDockWidgetArea
+        }
+        # Docks hinzufügen
+        for i, (name, dock) in enumerate(self.modules.items()):
+            self.addDockWidget(self.std_pos[name], dock)
+        
+        # Menü zum Anzeigen/Verstecken
+        self.module_menu = self.menuBar().addMenu("Module")
+        for name, dock in self.modules.items():
+            action = QAction(name, self, checkable=True, checked=True)
+            action.triggered.connect(lambda checked, d=dock: d.setVisible(checked))
+            dock.visibilityChanged.connect(lambda visible, a=action: a.setChecked(visible))
+            self.module_menu.addAction(action)
+        
+    def closeEvent(self, event):
+        self.__revoke_prevent_device_sleep()
+        self._main_worker.stop()
+        self._db.save_layout(self.saveState())
+        event.accept()
+    
+    def __set_theme(self, theme:Theme) -> None:
+        """Set the theme of the application.
+
+        Args:
+            theme (Theme): The theme to set.
+        """
+        assert isinstance(theme, Theme) or theme in Theme
+        if isinstance(theme, int):
+            theme = Theme(theme)
+        
+        
+        self.__current_theme = theme
+        
+        match theme:
+            case Theme.AUTO:
+                self.theme_auto.setChecked(True)
+                theme_str = str(darkdetect.theme()).lower()
+                qdarktheme.setup_theme(theme_str)
+            case Theme.LIGHT:
+                self.theme_light.setChecked(True)
+                qdarktheme.setup_theme("light")
+            case Theme.DARK:
+                self.theme_dark.setChecked(True)
+                qdarktheme.setup_theme("dark")
+    
+    def __init_theme_menu(self):
+        """Initialize the theme menu in the menu bar."""
+        self.theme_menu = self.menuBar().addMenu("Theme")
+        self.theme_auto = QAction("Automatisch (System)", self, checkable=True)
+        self.theme_light = QAction("Hell", self, checkable=True)
+        self.theme_dark = QAction("Dunkel", self, checkable=True)
+        self.theme_action_group = QActionGroup(self)
+        self.theme_action_group.setExclusive(True)
+        
+        for action in [self.theme_auto, self.theme_light, self.theme_dark]:
+            self.theme_menu.addAction(action)
+            self.theme_action_group.addAction(action)
+
+        self.theme_auto.triggered.connect(lambda: self.__set_theme(Theme.AUTO))
+        self.theme_light.triggered.connect(lambda: self.__set_theme(Theme.LIGHT))
+        self.theme_dark.triggered.connect(lambda: self.__set_theme(Theme.DARK))
+
+        self.__set_theme(self._global_settings.general.theme)
+    
+    def _open_settings_window(self, initial_tab: int = SettingsWindow.TAB_GENERAL):
+        """Öffnet das Einstellungsfenster.
+
+        :param initial_tab: Index des Tabs, der beim Öffnen aktiv sein soll.
+        :type initial_tab: int
+        """
+        settings_window = SettingsWindow(self, self._global_settings, initial_tab=initial_tab)
+        settings_window.settings_saved.connect(self._on_settings_saved)
+        settings_window.general_settings_changed.connect(self._on_general_settings_change)
+        settings_window.warning_settings_changed.connect(self._information_engine.on_new_warning_settings)
+        # settings_window.sound_settings_changed.connect(self._reload_sound_settings)
+
+        self._pause_all_workers()
+        settings_window.exec()
+        self._resume_all_workers()
+    
+    def _on_settings_saved(self, settings):
+        """Update the settings reference in the Window after settings where saved.
+        
+        
+        :param settings: New GlobalSettings Oject
+        """
+        self._global_settings = settings
+        
+    # def _reload_sound_settings(self):
+    #     """Reload sound/volume mappings for the main sound players after sound settings changed."""
+    #     self._default_sound_box.reload_sound_settings()
+    #     self._priority_sound_box.reload_sound_settings()
+
+    def _pause_all_workers(self):
+        """Pause all periodic workers or tasks found to self.periodic_workers
+        """
+        for worker in self._workers:
+            worker.pause()
+    
+    def _resume_all_workers(self):
+        for worker in self._workers:
+            worker.resume()  
+    
+    def _on_general_settings_change(self, new_settings:GeneralSettings):
+        """Wird aufgerufen, wenn die allgemeinen Einstellungen geändert wurden.
+        
+        :param new_settings: Die neuen allgemeinen Einstellungen
+        """
+        if self._global_settings.general.ip != new_settings.ip:
+            self._main_worker.set_endpoint_ip(new_settings.ip)
+        
+        if self._global_settings.general.intervall != new_settings.intervall:
+            self._main_worker.set_interval(new_settings.intervall)
+        
+        if self.__current_theme != new_settings.theme:
+            self.__set_theme(new_settings.theme)
+        
+    def __set_prevent_device_sleep(self):
+        """Tell the System not to turn off the Display or device because the App is active and has Priority."""
+        if sys.platform == 'win32':
+            import ctypes
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ES_DISPLAY_REQUIRED = 0x00000002
+            ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)
+        elif sys.platform.startswith('linux'):
+            import subprocess
+            if os.system("command -v systemd-inhibit > /dev/null") == 0:
+                try:
+                    self.__inhibit_process = subprocess.Popen(
+                        ["systemd-inhibit", "--what=idle:sleep", "why=WTCopilot is running", "sleep", "infinity"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                except Exception as e:
+                    print(f"Failed to activate Sleep Lock: {e}")
+            
+    def __revoke_prevent_device_sleep(self):
+        """Tell the system it is allowed to turn off the Display and Device automatically again."""
+        if sys.platform == 'win32':
+            import ctypes
+            ES_CONTINUOUS = 0x80000000
+            ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+        elif sys.platform.startswith('linux'):
+            import subprocess
+            if self.__inhibit_process:
+                try:
+                    self.__inhibit_process.terminate()
+                    self.__inhibit_process.wait()
+                    self.__inhibit_process = None
+                except Exception as e:
+                    print(f"Failed to deactivate Sleep Lock: {e}")
+
+
+class OLdMainWindow(QMainWindow):
     __inhibit_process = None
     __global_settings:GlobalSettings
     _default_sound_box:SoundBox
@@ -58,13 +309,13 @@ class MainWindow(QMainWindow):
         self.setDockOptions(QMainWindow.DockOption.AllowNestedDocks | QMainWindow.DockOption.AllowTabbedDocks | QMainWindow.DockOption.AnimatedDocks | QMainWindow.DockOption.GroupedDragging)
         
         self._default_sound_box = SoundBox(channel_index=0)
-        self._priority_sound_box = SoundBox(channel_index=1)
+        self._priority_sound_box = SoundBox(channel_index=1) # TODO: Rework sound engine
         
         self.db = LocalDB()
         self.__global_settings = GlobalSettings.from_dict(self.db.get_global_settings())
-        self.updater = WTUpdater(self.__global_settings.general.ip, DEBUG_MODE)
-        self.own_plane:WTPlane|None = None
         self.update_interval = self.__global_settings.general.intervall
+                
+        self.own_plane:Plane|None = None
         self.error_intervall = 5000
         self.worker_had_error = False
         
@@ -137,21 +388,14 @@ class MainWindow(QMainWindow):
             :param std_error_intervall: The intervall of running the worker in case of an error in ms, defaults to 5000
             :type std_error_intervall: int, optional
         """
-        self.fetcher_worker = dataFetcher(endpoint_ip, debug_mode, std_intervall, std_error_intervall)
+        self.fetcher_worker = PlaneUpdateWorker(endpoint_ip, debug_mode, std_intervall, std_error_intervall)
         self.fetcher_worker.new_plane_data.connect(self.__update_plane)
         self.periodic_workers.append(self.fetcher_worker)
         
         
     def init_warning_modules(self):
         """init modules for calculating warnings and allerts"""
-        self._plane_speed_warning_e = PlaneSpeedWarningEngine(
-            speed_warning_treshold=self.__global_settings.warning.speed_treshold,
-            min_diff=self.__global_settings.warning.min_diff,
-            max_diff=self.__global_settings.warning.max_diff,
-            mach_speed_threshold=self.__global_settings.warning.mach_threshold,
-            mach_min_diff=self.__global_settings.warning.min_mach_diff,
-            mach_max_diff=self.__global_settings.warning.max_mach_diff
-        )
+        self._plane_speed_warning_e = PlaneSpeedWarningEngine(self.__global_settings.warning)
            
     def connect_signals(self):
         """Connect Signals and Slots between GUI and Backend Workers."""
@@ -161,11 +405,11 @@ class MainWindow(QMainWindow):
         self._plane_speed_warning_e.play_sound_signal.connect(self.play_sounds)
         self._plane_speed_warning_e.stop_sound_signal.connect(self.stop_sounds)
         
-    def __update_plane(self, plane:WTPlane)-> None:
+    def __update_plane(self, plane:Plane)-> None:
         """Update the Plane for Which informations are displayed
 
         :param plane: the New Plane Object
-        :type plane: WTPlane
+        :type plane: Plane
         """
         # TODO: Remove While Implementing everything with Signals
         self.own_plane = plane

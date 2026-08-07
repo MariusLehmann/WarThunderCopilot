@@ -1,7 +1,7 @@
 from PySide6.QtCore import QObject, QThread, Signal, QTimer, Slot
-from Packages.Models.Plane import WTPlane
+from Packages.Models.Plane import Plane
 import threading
-from .wtFetcher import WTUpdater, TelemetryNotFoundException, PlaneNotFoundException, TelemetryData
+from .telemetry_fetcher import TelemetryFetcher, TelemetryNotFoundException, PlaneNotFoundException, TelemetryData
 
 class AsyncPeriodicWorker(QObject):
     running_thread:QThread
@@ -82,13 +82,13 @@ class AsyncPeriodicWorker(QObject):
         """
         self._pause_event.clear()
         
-class dataFetcher(AsyncPeriodicWorker):
+class PlaneUpdateWorker(AsyncPeriodicWorker):
     # Signals Emitted by this Worker
-    new_plane_data = Signal(WTPlane)
+    new_plane_data = Signal(Plane)
     new_telemetry_data = Signal(TelemetryData)
     new_map_data = Signal(dict) #TODO: Implement with Map Support
 
-    
+
     def __init__(self,endpoint_ip:str, debug_mode:bool = False, std_intervall_ms:int = 100, error_intervall_ms:int = 5000):
         """Create a Worker to fetch data from the local WT-Web-Endpoint
 
@@ -100,28 +100,28 @@ class dataFetcher(AsyncPeriodicWorker):
         :type std_intervall_ms: int, optional
         :param error_intervall_ms: The intervall of running this Worker in ms as long as an error occured, defaults to 5000
         :type error_intervall_ms: int, optional
-        
+
         Signals:
-            new_plane_data (WTPlane): Emitted when planer type was changed ingame, sends new Plane Data (e.g., plane type changes).
+            new_plane_data (Plane): Emitted when planer type was changed ingame, sends new Plane Data (e.g., plane type changes).
             new_telemetry_data (dict): Emitted when new telemetry data is fetched.
             new_map_data (dict): Emitted when new map data is available (TODO: Implement with Map Support).
         """
         super().__init__(std_intervall_ms)
-        self.running_thread.setObjectName("dataFetcherThread")
+        self.running_thread.setObjectName("PlaneUpdateWorkerThread")
         self.std_intervall = std_intervall_ms
         self.error_intervall = error_intervall_ms
-        self.fetcher = WTUpdater(endpoint_ip, debug_mode)
-        self.own_plane: WTPlane|None = None
+        self.fetcher = TelemetryFetcher(endpoint_ip, debug_mode)
+        self.own_plane: Plane|None = None
         self.__last_was_success = True
         self.__debug_mode = debug_mode
-    
+
     def on_ip_change(self, new_ip:str):
         """Update the Endpoint IP of the fetcher
 
         :param new_ip: The new IP Address of the local Warthunder web endpoint
         :type new_ip: str
         """
-        self.fetcher = WTUpdater(new_ip, self.__debug_mode)
+        self.fetcher = TelemetryFetcher(new_ip, self.__debug_mode)
     
     def _work(self):
         errors_occured = False
@@ -138,8 +138,8 @@ class dataFetcher(AsyncPeriodicWorker):
         if not errors_occured and tel is not None:
             self.new_telemetry_data.emit(tel)
             
-            if self.own_plane is None or not (self.own_plane.planetype == tel.planetype): 
-                self.own_plane = WTPlane(tel.planetype)
+            if self.own_plane is None or not (self.own_plane.planetype == tel.planetype):
+                self.own_plane = Plane(tel.planetype)
                 self.new_plane_data.emit(self.own_plane)
             
             self.own_plane.set_telemetry(tel)

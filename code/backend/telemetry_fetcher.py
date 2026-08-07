@@ -4,38 +4,66 @@ from paths import get_resource_path
 import time
 import json
 
-TELEMETRY_INFORMATION = {
-    "planetype": ["airframe"],
-    "flaps": ["flapState", "flaps, %"],
-    "gear": ["gearState", "gear, %"],
-    "lat": ["lat"],
-    "lon": ["lon"],
-    "ias": ["IAS, km/h"],
-    "airbrake": ["airbrake, %"],
-    "mach_speed": ["mach", "M"]
-}
-OPTIONAL_TELEMETRY = [
-    "airbrake",
-    "lat",
-    "lon", 
-    "mach_speed"
-]
-class TelemetryNotFoundException(Exception):
-    pass
-class PlaneNotFoundException(Exception):
-    pass
+from wt_dataclasses import CurrentFlapState, TelemetryData
 
 @dataclass
-class TelemetryData:
-    planetype:str
-    flaps: int
+class ParsedTelemetryData:
+    planetype: str
+    flapState: int
+    flapsAim: int
     gear: int
     ias: int
     lat: float = 0
     lon: float = 0
     airbrake: int = 0
     mach_speed: float = 999.9
-class WTUpdater(object):
+    sweep_lever: int | None = None
+    sweep_indicator: int | None = None
+        
+    def to_telemetry_data(self) -> TelemetryData:
+        return TelemetryData(
+            planetype=self.planetype,
+            flaps=CurrentFlapState(aim=self.flapsAim, current=self.flapState),
+            gear=self.gear,
+            ias=self.ias,
+            lat=self.lat,
+            lon=self.lon,
+            airbrake=self.airbrake,
+            mach_speed=self.mach_speed,
+            wing_sweep_lever=self.sweep_lever,
+            wing_sweep_indicator=self.sweep_indicator
+        )
+    
+TELEMETRY_INFORMATION = {
+    "planetype": ["airframe"],
+    "flapState": ["flaps, %", "flapState"],
+    "flapsAim": ["flaps"],
+    "gear": ["gear, %", "gearState"],
+    "lat": ["lat"],
+    "lon": ["lon"],
+    "ias": ["IAS, km/h"],
+    "airbrake": ["airbrake, %"],
+    "mach_speed": ["mach", "M"],
+    "sweep_lever": ["wing_sweep_lever"],
+    "sweep_indicator": ["wing_sweep_indicator"]
+}
+    
+OPTIONAL_TELEMETRY = [
+    "airbrake",
+    "lat",
+    "lon", 
+    "mach_speed",
+    "sweep_lever",
+    "sweep_indicator"
+]
+class TelemetryNotFoundException(Exception):
+    pass
+class PlaneNotFoundException(Exception):
+    pass
+
+
+    
+class TelemetryFetcher(object):
     def __init__(self, ip_addr, debug_mode=False):
         """Create an Fetcher to get Information from the WT-API
             If Debug Mode is enabled, information are fetched from a local json file instead of the API.
@@ -64,7 +92,9 @@ class WTUpdater(object):
                 
             self.telemetry = self.__parse_telemetry(data)
                 
-                
+    def set_ip_addr(self, ip_addr:str) -> None:
+        self.ip_addr = ip_addr
+        self.tel_interface = telemetry.TelemInterface(self.ip_addr)
             
    
     def __update_telemetry(self) -> None:
@@ -74,7 +104,7 @@ class WTUpdater(object):
         
         self.telemetry = self.__parse_telemetry(self.tel_interface.basic_telemetry, self.tel_interface.full_telemetry)
     
-    def __parse_telemetry(self, source:dict, optional_source:dict|None = None) -> TelemetryData:
+    def __parse_telemetry(self, source:dict, optional_source:dict|None = None) -> ParsedTelemetryData:
         """Parse needet data from the Source, try optional source if given and not found in main source.
         Needet Arguments are defined in TELEMETRY_INFORMATION and OPTIONAL_TELEMETRY.
         
@@ -83,7 +113,7 @@ class WTUpdater(object):
             optional_source (dict,optional): Second dict for use if the First one doesn't contain needet data.
         
         Returns:
-            dict: A Dict containing the parsed information, with the keys defined in TELEMETRY_INFORMATION.
+            ParsedTelemetryData: An instance of ParsedTelemetryData containing the parsed information.
         """
         result_dict = {}
         
@@ -102,16 +132,16 @@ class WTUpdater(object):
             if val == "--null--" and category not in OPTIONAL_TELEMETRY:
                 raise TelemetryNotFoundException(f"Telemetry object {category} ({keys}) not found in Telemetry of the Plane.")
             
-        return TelemetryData(**result_dict)
+        return ParsedTelemetryData(**result_dict)
         
-            
-    
     def get_plane_telemetry(self) -> TelemetryData|None:
-        return self.telemetry
+        if self.telemetry:
+            return self.telemetry.to_telemetry_data()
+        return None
     
     
 if __name__ == '__main__':
-    updater = WTUpdater("192.168.0.40")
+    updater = TelemetryFetcher("192.168.0.40")
     while True:
         updater.fetch_data()
         print(updater.get_plane_telemetry())
