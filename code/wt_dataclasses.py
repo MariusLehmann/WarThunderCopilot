@@ -105,6 +105,17 @@ class GeneralSpeedLimits:
             landing_flap=self.landing_flap
         )
         
+    def get_limit_list(self) -> list[tuple[str, SpeedLimit|int|None]]:
+        """Get a list of all speed limits for this plane, as tuples of (name, SpeedLimit)"""
+        return [
+            ("frame", self.frame),
+            ("frame_mach", self.frame_mach),
+            ("gear", self.gear),
+            ("combat_flap", self.combat_flap),
+            ("start_flap", self.start_flap),
+            ("landing_flap", self.landing_flap)
+        ]
+        
     @staticmethod
     def __calc_current(min, max, sweep):
         return min + (max - min) * sweep
@@ -125,3 +136,44 @@ class PlaneProperties:
     planename: str
     
     speed_limits: GeneralSpeedLimits
+    
+class ValueHistory:
+    __history: list
+    __max_length: int
+    __acc1: list
+    
+    def __init__(self, history_length: int = 5):
+        self.__history = []
+        self.__max_length = history_length
+        self.__acc1 = []
+
+    def add(self, value):
+        current_length = len(self.__history)
+        
+        if current_length > 0: 
+            self.__acc1.append(value - self.__history[-1])
+        
+        self.__history.append(value)
+
+        if current_length +1 > self.__max_length: 
+            self.__history.pop(0)
+        
+        if len(self.__acc1) > self.__max_length: 
+            self.__acc1.pop(0)
+    
+    @property
+    def current(self):
+        return self.__history[-1]
+    
+    @property
+    def is_accelerating(self) -> bool:
+        if len(self.__acc1) == 0:
+            return False
+        return sum(self.__acc1) / len(self.__acc1) > 0
+    
+    @property
+    def is_decelerating(self) -> bool:
+        if len(self.__acc1) == 0:
+            return False
+        return sum(self.__acc1) / len(self.__acc1) < 0
+                

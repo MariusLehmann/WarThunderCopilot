@@ -1,5 +1,5 @@
 from PySide6.QtCore import QObject, Signal
-from Packages.Models.Plane import Plane
+from Models import Plane
 from backend.oldSoundEngine import Sound
 from backend.oldSoundEngine.sounds import SpeedWarningSound, FlapSpeedWarningSound, GearSpeedWarningSound, FlapInfoSound
 from backend.telemetry_fetcher import TelemetryData

@@ -1,54 +1,81 @@
 from PySide6.QtWidgets import QDockWidget, QWidget, QVBoxLayout, QLabel, QHBoxLayout, QGroupBox
+from PySide6.QtCore import Qt, QTimer, Slot
 
-from PySide6.QtCore import Qt, QTimer
+from enum import Enum
 
-from gui.base_elements import SelectableLabel, Lamp
+from gui.base_elements import SelectableLabel, Lamp, LampState
 
-from Packages.Models.Plane import Plane, TelemetryData
+from Models import Plane, TelemetryData
+
+
+from wt_dataclasses import FlapState, ValueHistory
+
+FlapStateDisplayText = {
+    FlapState.COMBAT.value: "Kampf",
+    FlapState.START.value: "Start",
+    FlapState.LANDING.value: "Landung"
+     
+}
+
 
 class FlapValueException(ValueError):
     pass
         
-class FlapsStatus(QWidget):
+class FlapsStatusDisplay(QWidget):
     """Anzeige aller Klappen-Zustände mit Hervorhebung des aktuellen."""
-    def __init__(self, states=["Kampf", "Start", "Landung"]):
+    def __init__(self, states:list[FlapState]=[]): #["Kampf", "Start", "Landung"]):
         super().__init__()
-        self.states = states
+        self.states = []
         self.labels = []
-        self.current_state = "Keine"
-        layout = QVBoxLayout(self)
+        self.current_state = FlapState.NONE
+        self._layout = QVBoxLayout(self)
+        self.set_states(states)
+
+    def set_states(self, states:list[FlapState]):
+        """Baut die Labels für die übergebenen Flap-States neu auf.
+
+        Wird aufgerufen, sobald ein (neues) Flugzeug bekannt ist, da erst
+        dann feststeht, welche Klappen-Stufen es überhaupt gibt.
+        """
+        for lbl in self.labels:
+            self._layout.removeWidget(lbl)
+            lbl.deleteLater()
+        self.labels = []
+        self.states = states
+        self.current_state = FlapState.NONE
+
         for state in states:
-            lbl = SelectableLabel(state)
-            lbl.setAlignment(Qt.AlignLeft)
+            lbl = SelectableLabel(state.value, FlapStateDisplayText[state.value])
+            lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
             lbl.setStyleSheet("color: gray")
-            layout.addWidget(lbl)
+            self._layout.addWidget(lbl)
             self.labels.append(lbl)
 
-    def set_state(self, current_state: str):
-        self.current_state = current_state
+    def set_state(self, new_state: FlapState, new_aim_state: FlapState): # TODO: Implement usage of Aim Level
+        self.current_state = new_state
+        
         for lbl in self.labels:
-            
-            if lbl.name == current_state:
+            if lbl.id == new_state.value:
                 lbl.activate()
                 # lbl.setStyleSheet("color: green; font-weight: bold")
             else:
                 lbl.deactivate()
                 # lbl.setStyleSheet("color: gray; font-weight: normal")
                 
-    def set_safe_level(self, level:str):
+    def set_safe_level(self, level:FlapState):
         """Set the highest Flap state which is usable safely.
         
         Args:
-            level(str): Highest safe Flap state, should be one of ["Keine", "Kampf", "Start", "Landung"]
+            level(FlapState): Highest safe Flap state
         
         Raises:
-            ValueError: If level is not one of ["Keine", "Kampf", "Start", "Landung"]
+            ValueError: If given Level is not Valid
             FlapValueException: If the current Plane does not have this type of Flaps
         """
         
-        if level not in ["Keine", "Kampf", "Start", "Landung"]:
+        if not isinstance(level, FlapState):
             raise ValueError(f"{level} is not a valid Flap State.")
-        if level == "Keine":
+        if level == FlapState.NONE:
             for lbl in self.labels:
                 lbl.mark_unsafe()
             return
@@ -61,124 +88,136 @@ class FlapsStatus(QWidget):
                 lbl.mark_safe()
             else:
                 lbl.mark_unsafe()
-                
 
+class MechanicalState(Enum):
+    RETRACTED = 0
+    MOVING = 1
+    DEPLOYED = 2        
+
+# TODO: build support for Planes Withount Brake-Flaps
 class AircraftStatusDock(QDockWidget):
-    """AircraftStatus als eigenes DockWidget, direkt einsatzbereit im MainWindow"""
-    def __init__(self, title="Aircraft Status", parent=None):
-        super().__init__(title, parent)
-        self.mainWindow = parent
-        
-        self.setObjectName(title)
-        # self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        self.setAllowedAreas(Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
-        self.setFloating(False)
-        self.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable | QDockWidget.DockWidgetClosable)
-
-        # Configure reload Timer
-        self.reload_timer = QTimer()
-        self.reload_timer.setSingleShot(True)
-        self.reload_timer.timeout.connect(self.init_window)
-        
-        # configure update Timer
-        self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.__update_data)
-        
-        self.init_window()
+    """AircraftStatus Dock Widget to be used in the main Window if activated"""
+    _main_layout: QHBoxLayout
     
+    
+    __lamps: dict[str, Lamp]
+    __mech_box: QGroupBox
+    
+    
+    def __init__(self, title="Aircraft Status"):
+        super().__init__(title)
+        self.setObjectName(title)
+        self.__lamps = {}
+        
+        self.setAllowedAreas(Qt.DockWidgetArea.TopDockWidgetArea | Qt.DockWidgetArea.BottomDockWidgetArea)
+        self.setFloating(False)
+        self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable | QDockWidget.DockWidgetFeature.DockWidgetClosable)
 
-    def init_window(self):
-        if self.mainWindow.own_plane is None:
-            print("No Plane found, trying to reload in 1s")
-            self.reload_timer.start(1000)
-            return
-        else:
-            self.reload_timer.stop()
-            
-        # Haupt-Widget im Dock
         main_widget = QWidget()
-        layout = QHBoxLayout(main_widget)
-
-        # Lampen
-        self.landing_gear = Lamp("Fahrwerk")
-        self.brake_flaps = Lamp("Bremsklappen")
+        self._main_layout = QHBoxLayout(main_widget)
         
-        landing_box = QGroupBox("Landung")
-        landing_layout = QHBoxLayout()
-        landing_layout.addWidget(self.landing_gear)
-        landing_layout.addWidget(self.brake_flaps)
-        landing_box.setLayout(landing_layout)
+        self.__lamps["landing_gear"] = Lamp("Fahrwerk")
+        self.__lamps["brake_flaps"] = Lamp("Bremsklappen")
+        self.__lamps["flaps"] = Lamp("Klappen")
         
-
-        # Klappen-Zustände
-        flap_box = QGroupBox("Klappen")
-        self.flaps_lamp = Lamp("Klappen")
+        mech_layout = QHBoxLayout()
+        mech_layout.addWidget(self.__lamps["landing_gear"])
+        mech_layout.addWidget(self.__lamps["brake_flaps"])
+        mech_layout.addWidget(self.__lamps["flaps"])
         
-        avaliable_flaps = []
-        avaliable_bool = self.mainWindow.own_plane.get_flaps_avaliable()
-        for i in range(3):
-            if avaliable_bool[i]:
-                avaliable_flaps.append(["Kampf", "Start", "Landung"][i])
+        self.__mech_box = QGroupBox("Mechanische Systeme")
+        self.__mech_box.setLayout(mech_layout)
+        self._main_layout.addWidget(self.__mech_box)
         
-        self.flaps_status = FlapsStatus(avaliable_flaps)
-        
-        flaps_layout = QHBoxLayout()
-        flaps_layout.addWidget(self.flaps_lamp)
-        flaps_layout.addWidget(self.flaps_status)
-        flap_box.setLayout(flaps_layout)
-        
-        layout.addWidget(flap_box)
-        layout.addWidget(landing_box)
+        self.__flap_status_box = QGroupBox("Klappen")
+        flap_layout = QHBoxLayout()       
+        self.__flap_status_box.setLayout(flap_layout)
+        self._flap_status_information = FlapsStatusDisplay()
+        flap_layout.addWidget(self._flap_status_information)
+        self._main_layout.addWidget(self.__flap_status_box)
         
         self.setWidget(main_widget)
         
-        # start periodic updates
-        self.update_timer.start(100)  # alle 0.1 Sekunden
-
-    def update_status(self, landing_gear: bool, brake_flaps: bool, flaps_state: str):
-        self.landing_gear.set_state(landing_gear) # TODO Add state blinking for moving parts
-        self.brake_flaps.set_state(brake_flaps)
-        self.flaps_lamp.set_state(flaps_state != "Keine")
-        self.flaps_status.set_state(flaps_state)
-        
-    def get_status(self):
-        return {
-            "landing_gear": self.landing_gear.state,
-            "brake_flaps": self.brake_flaps.state,
-            "flaps_state": self.flaps_lamp.state,
-            "flaps_status": self.flaps_status.current_state
-        }
-        
-    def __update_data(self):
-        TRANS_DICT = {
-            "combat": "Kampf",
-            "start": "Start",
-            "landing": "Landung",
-            "none": "Keine"
-        }
-        
-        tel:TelemetryData = self.mainWindow.own_plane.telemetry
-        safe_flap_state = self.mainWindow.own_plane.get_safe_flap_state()
-        
-        safe_flap_state = TRANS_DICT[safe_flap_state]
-        self.flaps_status.set_safe_level(safe_flap_state)
-        
-        if tel is None or tel == {}:
-            return
+        self.__gear_hist = ValueHistory(5)
+        self.__flap_hist = ValueHistory(5)
+        self.__breaking_flap_hist = ValueHistory(5)
     
-        gear = tel.gear == 100 if tel.gear is not None else False
-        flaps_bool = tel.flaps != 0 if tel.flaps is not None else False
-        airbrake_bool = tel.airbrake != 0 if tel.airbrake is not None else False
+    @Slot(str)
+    def on_no_plane(self, message:str):
+        for lamp in self.__lamps.values():
+            lamp.set_state(LampState.OFF)
+        self._flap_status_information.set_states([])
+        self._flap_status_information.set_state(FlapState.NONE, FlapState.NONE)
+        self._flap_status_information.set_safe_level(FlapState.NONE)
+
+    @Slot(Plane)
+    def on_new_plane(self, updated_plane:Plane):
+        # FlapState.NONE hat keinen Eintrag in FlapStateDisplayText und wird
+        # nicht als eigenes, wählbares Klappen-Label angezeigt.
+        possible_states = [possible.name for possible in updated_plane.flaps.possible
+                            if possible.name != FlapState.NONE]
+        self._flap_status_information.set_states(possible_states)
+        self.on_new_telemetry(updated_plane)
+
+    @Slot(Plane)
+    def on_new_telemetry(self, updated_plane:Plane):
+        new_telemetry = updated_plane.telemetry
         
-        if flaps_bool:
-            if tel.flaps <= 25:
-                flaps_state = "Kampf"
-            elif tel.flaps <= 50:
-                flaps_state = "Start"
+        current_flap_aim = self.__get_flap_state_by_deployed_perc(updated_plane, new_telemetry.flaps.aim)
+        current_flap_state = self.__get_flap_state_by_deployed_perc(updated_plane, new_telemetry.flaps.current)
+        
+        safe_flap_state = FlapState.NONE
+        current_flap_speed_limits = updated_plane.properties.speed_limits
+        
+        ias = new_telemetry.ias
+        
+        if current_flap_speed_limits.landing_flap is not None and ias <= current_flap_speed_limits.landing_flap:
+            safe_flap_state = FlapState.LANDING
+        elif current_flap_speed_limits.start_flap is not None and ias <= current_flap_speed_limits.start_flap:
+            safe_flap_state = FlapState.START
+        elif current_flap_speed_limits.combat_flap is not None and ias <= current_flap_speed_limits.combat_flap:
+            safe_flap_state = FlapState.COMBAT
+            
+        self._flap_status_information.set_safe_level(safe_flap_state)
+        self._flap_status_information.set_state(current_flap_state, current_flap_aim)
+        
+        self.__gear_hist.add(new_telemetry.gear)
+        self.__flap_hist.add(new_telemetry.flaps.current)
+        
+        if new_telemetry.airbrake is not None:
+            self.__breaking_flap_hist.add(new_telemetry.airbrake)
+            
+        if self.__gear_hist.current > 0:
+            if self.__gear_hist.is_accelerating or self.__gear_hist.is_decelerating:
+                self.__lamps["landing_gear"].set_state(LampState.BLINKING)
             else:
-                flaps_state = "Landung"
-            
+                self.__lamps["landing_gear"].set_state(LampState.ON)
         else: 
-            flaps_state = "Keine"
+            self.__lamps["landing_gear"].set_state(LampState.OFF)
             
-        self.update_status(gear, airbrake_bool, flaps_state)
+        if self.__flap_hist.current > 0:
+            if self.__flap_hist.is_accelerating or self.__flap_hist.is_decelerating:
+                self.__lamps["flaps"].set_state(LampState.BLINKING)
+            else:
+                self.__lamps["flaps"].set_state(LampState.ON)
+        else: 
+            self.__lamps["flaps"].set_state(LampState.OFF)
+                    
+        if new_telemetry.airbrake is not None:
+            if self.__breaking_flap_hist.current > 0:
+                if self.__breaking_flap_hist.is_accelerating or self.__breaking_flap_hist.is_decelerating:
+                    self.__lamps["brake_flaps"].set_state(LampState.BLINKING)
+                else:
+                    self.__lamps["brake_flaps"].set_state(LampState.ON)
+            else:
+                self.__lamps["brake_flaps"].set_state(LampState.OFF)
+        
+    
+    @staticmethod
+    def __get_flap_state_by_deployed_perc(plane:Plane, perc:float) -> FlapState:
+        for state in plane.flaps.possible:
+            if perc <= state.min_perc:
+                return state.name
+        
+        return FlapState.NONE
+    

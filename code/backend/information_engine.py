@@ -5,7 +5,7 @@ from PySide6.QtCore import QObject, Signal, Slot
 from .settings import WarningSettings, GlobalSettings
 
 from Packages.local_db import LocalDB
-from Packages.Models.Plane import Plane
+from Models import Plane
 from wt_dataclasses import FlapState, GENERAL_FLAP_STATES
 from backend.SoundEngine import WT_Sound
 
@@ -64,7 +64,7 @@ class AcousticInformationEngine(QObject):
         informations = set()
         
         current_safe_flap_state = self.__get_safe_flap_state()
-        current_flap_state = self.__gt_current_flap_state()
+        current_flap_state = self.__get_current_flap_state()
         current_speed = self._plane.telemetry.ias
         
         
@@ -164,8 +164,6 @@ class AcousticInformationEngine(QObject):
         # window = hist[-(ACCELERATION_WINDOW_SIZE + 1):]
         # accelerations = [window[i] - window[i - 1] for i in range(1, len(window))]
         # mean_acceleration = sum(accelerations) / len(accelerations)
-        if name == "flap":
-            print(f"Flap acc: {accelerations[-1]}")
         # if sum(accelerations) / len(accelerations) < 0:
         #     # Not accelerating (anymore) - e.g. cruising just above the warning
         #     # threshold at the plane's max speed. No need to warn.
@@ -235,7 +233,7 @@ class AcousticInformationEngine(QObject):
         return FlapState.NONE
                 
             
-    def __gt_current_flap_state(self) -> FlapState:
+    def __get_current_flap_state(self) -> FlapState:
         if self._plane is None:
             return FlapState.NONE
         for state in self._plane.flaps.possible[::-1]:

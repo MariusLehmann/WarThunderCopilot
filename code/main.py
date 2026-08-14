@@ -15,7 +15,7 @@ def main():
     
 
 def test():
-    from Packages.Models.Plane import Plane
+    from Models import Plane
     from backend.telemetry_fetcher import TelemetryFetcher
     
     from backend.SoundEngine import SoundEngine, WT_Sound

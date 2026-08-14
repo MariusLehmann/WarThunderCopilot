@@ -1,10 +1,12 @@
+import copy
+
 from dataclasses import dataclass, field
 from Packages.connector import PlaneNotFound, BackendAPIConnection, APIConnectionError
 from backend.telemetry_fetcher import TelemetryData
 from backend.settings import WarningSettings
 from enum import Enum
 
-from wt_dataclasses import PlaneProperties, CurrentSpeedLimits, CurrentFlapState, PossibleFlapState, GENERAL_FLAP_STATES
+from wt_dataclasses import PlaneProperties, CurrentSpeedLimits, CurrentFlapState, PossibleFlapState, GENERAL_FLAP_STATES, FlapState
 
 conn = BackendAPIConnection()
 
@@ -62,6 +64,10 @@ class FlapProperties:
             any(state.name == "landing" for state in self.possible)
         )
 
+    def get_possible_flap_states(self) -> list[FlapState]:
+        res = []
+        for possible_state in self.possible:
+            res.append(possible_state.name)
 
 class Plane(object):
     telemetry:TelemetryData
@@ -103,6 +109,15 @@ class Plane(object):
             Those are the max speeds that are currently relevant, based on the current flap state.
         """
         return self.properties.speed_limits.get_current_limits(self.telemetry.wing_sweep_indicator)
+    
+    def copy(self) -> "Plane":
+        """Creates a deep Copy of the Plane Object
+
+        :return: new copied plane Object
+        :rtype: Plane
+        """
+        new_plane = copy.deepcopy(self)
+        return new_plane
     
     # def recalculate_thresholds(self, warning_settings:WarningSettings) -> CurrentSpeedLimits|None:
     #     """Recalculate the speed/mach warning thresholds for this plane and store them in self.thresholds.

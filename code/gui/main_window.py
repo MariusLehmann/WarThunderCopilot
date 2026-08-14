@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QLabel
 from PySide6.QtGui import QAction, QIcon, QActionGroup
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 import sys
 import os
@@ -10,10 +10,8 @@ from logging_setup import get_logger
 
 from typing import Protocol
 
-from Models import Theme
-
 from gui.base_elements import BasicDockWidget
-from Packages.Models.Plane import Plane
+from Models import Plane, Theme
 from Packages.local_db import LocalDB
 
 from gui.status_widget import AircraftStatusDock
@@ -64,6 +62,7 @@ class MainWindow(QMainWindow):
     _information_engine: AcousticInformationEngine
     _sound_engine: SoundEngine
     
+    S_ThemeChanged = Signal(Theme)
     
     def __init__(self):
         super().__init__()
@@ -83,11 +82,13 @@ class MainWindow(QMainWindow):
         
         self.__init_settings()
         self.__init_main_worker()
-        self.__init_information_engine()
-        # self.__init_modules() # TODO: reactivate
-        
         # Theme-Umschalter
         self.__init_theme_menu()
+        
+        self.__init_information_engine()
+        self.__init_modules()
+        
+        
 
         # Einstellungen-Menü
         self.settings_menu = self.menuBar().addMenu("Einstellungen")
@@ -135,14 +136,26 @@ class MainWindow(QMainWindow):
     def __init_modules(self):
         self.modules = {
             # "Modul A": ModuleDock("Modul A", "Inhalt von Modul A"),
-            "Plane Information": InfoDockWidget(self),
-            "Status": AircraftStatusDock("Flugzeug Status", self)
+            "Plane Information": InfoDockWidget(self._global_settings.general.theme, "Plane Information"),
+            "Status": AircraftStatusDock("Flugzeug Status")
         }
         self.std_pos = {
             # "Modul A": Qt.DockWidgetArea.RightDockWidgetArea,
             "Plane Information": Qt.DockWidgetArea.RightDockWidgetArea,
             "Status": Qt.DockWidgetArea.BottomDockWidgetArea
         }
+        
+        #Signal Connections for Information Widget    
+        self.S_ThemeChanged.connect(self.modules["Plane Information"].on_theme_change)
+        self._main_worker.S_NewPlane.connect(self.modules["Plane Information"].on_new_plane)
+        self._main_worker.S_NoPlane.connect(self.modules["Plane Information"].on_no_plane)
+        
+        # Signal Connections for Status Widget
+        self._main_worker.S_NewPlane.connect(self.modules["Status"].on_new_plane)
+        self._main_worker.S_TelUpdate.connect(self.modules["Status"].on_new_telemetry)
+        self._main_worker.S_NoPlane.connect(self.modules["Status"].on_no_plane)
+    
+        
         # Docks hinzufügen
         for i, (name, dock) in enumerate(self.modules.items()):
             self.addDockWidget(self.std_pos[name], dock)
@@ -185,6 +198,8 @@ class MainWindow(QMainWindow):
             case Theme.DARK:
                 self.theme_dark.setChecked(True)
                 qdarktheme.setup_theme("dark")
+        
+        self.S_ThemeChanged.emit(theme)
     
     def __init_theme_menu(self):
         """Initialize the theme menu in the menu bar."""

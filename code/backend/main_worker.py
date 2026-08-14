@@ -13,7 +13,7 @@ gemeinsam.
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 import threading
 
-from Packages.Models.Plane import Plane, PlaneFetchError
+from Models import Plane, PlaneFetchError
 from backend.telemetry_fetcher import TelemetryFetcher, TelemetryNotFoundException, PlaneNotFoundException
 
 
@@ -42,7 +42,7 @@ class MainWorker(QObject):
     # Anzahl aufeinanderfolgender Fehl-Fetches, die stillschweigend toleriert werden
     # (kein Signal, kein Backoff), bevor S_NoPlane emittiert wird. Überspielt kurze,
     # vereinzelte Aussetzer, ohne dass andere Module davon überhaupt etwas mitbekommen.
-    RUNS_BEFORE_NO_PLANE = 3
+    RUNS_BEFORE_NO_PLANE = 5
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 from PySide6.QtCore import QObject, QThread, Signal, QTimer, Slot
-from Packages.Models.Plane import Plane
+from Models import Plane
 import threading
 from .telemetry_fetcher import TelemetryFetcher, TelemetryNotFoundException, PlaneNotFoundException, TelemetryData
 
