@@ -101,11 +101,15 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda checked=False, idx=tab_index: self._open_settings_window(idx))
             self.settings_menu.addAction(action)
 
-        # Layout wiederherstellen
+        # Layout und Fenster-Geometrie (Position/Größe) wiederherstellen
         saved_layout = self._db.get_layout()
         if saved_layout:
             self.restoreState(saved_layout)
-        
+
+        saved_geometry = self._db.get_layout(name="main_geometry")
+        if saved_geometry:
+            self.restoreGeometry(saved_geometry)
+
         self._main_worker.start()
         
     def __init_settings(self):
@@ -172,6 +176,7 @@ class MainWindow(QMainWindow):
         self.__revoke_prevent_device_sleep()
         self._main_worker.stop()
         self._db.save_layout(self.saveState())
+        self._db.save_layout(self.saveGeometry(), name="main_geometry")
         event.accept()
     
     def __set_theme(self, theme:Theme) -> None:

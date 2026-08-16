@@ -220,15 +220,24 @@ class SoundEngine(QObject):
         :raises ValueError: if `queue` does not refer to a known queue.
         """
         properties = self.__get_properties(sound)
+        # Master-Volume erst hier auf eine Kopie anwenden (statt die gespeicherten
+        # properties zu mutieren) - sonst würde sich der Faktor bei jedem Abspielen
+        # erneut mit der zuvor schon reduzierten Lautstärke multiplizieren.
+        effective_properties = SoundProperties(
+            name=properties.name,
+            file_path=properties.file_path,
+            volume=properties.volume * self._sound_settings.master_volume,
+            overlapping=properties.overlapping,
+        )
 
         if immediate or properties.overlapping:
-            self._players[self._IMMEDIATE_QUEUE].enqueue(sound.value.identifier, properties)
+            self._players[self._IMMEDIATE_QUEUE].enqueue(sound.value.identifier, effective_properties)
             return
 
         player = self._players.get(queue)
         if player is None:
             raise ValueError(f"Unknown queue '{queue}'. Create it first via create_queue().")
-        player.enqueue(sound.value.identifier, properties)
+        player.enqueue(sound.value.identifier, effective_properties)
 
     def stop_sound(self, sound: WT_Sound | Iterable[WT_Sound], queue: str | None = None) -> int:
         """Remove not-yet-played occurrences of the given sound(s) from the queue(s).

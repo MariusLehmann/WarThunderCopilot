@@ -142,7 +142,7 @@ class SoundSettingsTab(SettingsTab):
             slider.valueChanged.connect(on_slider_changed)
 
             play_btn = QPushButton("▶")
-            play_btn.clicked.connect(lambda checked=False, s=sound: self._preview_engine.play_sound(s, immediate=True))
+            play_btn.clicked.connect(lambda checked=False, s=sound: self._play_preview(s))
             grid.addWidget(play_btn, row, 5)
 
             self._widgets[identifier] = {
@@ -157,6 +157,16 @@ class SoundSettingsTab(SettingsTab):
             row += 1
 
         self.main_layout.addLayout(grid)
+
+    def _play_preview(self, sound: WT_Sound):
+        """Spielt einen Sound mit dem aktuellen (ggf. noch ungespeicherten) UI-Stand ab.
+
+        Die Preview-Engine liest ihre Lautstärke/Datei-Zuordnung sonst nur aus den beim
+        Erzeugen geladenen Sound-Settings; ohne diesen Sync würde der Play-Button also
+        die zuletzt gespeicherten statt der gerade im Slider eingestellten Werte hören lassen.
+        """
+        self._preview_engine.on_new_sound_settings(self.get_settings())
+        self._preview_engine.play_sound(sound, immediate=True)
 
     def load_settings(self, settings: SoundSettings):
         """Übernimmt gespeicherte Sound-Einstellungen in die UI-Elemente."""
