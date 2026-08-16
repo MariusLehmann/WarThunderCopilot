@@ -169,11 +169,17 @@ class ValueHistory:
     def is_accelerating(self) -> bool:
         if len(self.__acc1) == 0:
             return False
+        return self.__history[0] < self.__history[-1]
+        
         return sum(self.__acc1) / len(self.__acc1) > 0
     
     @property
     def is_decelerating(self) -> bool:
         if len(self.__acc1) == 0:
             return False
+        return self.__history[0] > self.__history[-1]
+        
         return sum(self.__acc1) / len(self.__acc1) < 0
-                
+    
+    def get_hist(self) -> list:
+        return self.__history.copy()

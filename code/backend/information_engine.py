@@ -147,9 +147,9 @@ class AcousticInformationEngine(QObject):
             # Warning speed not (yet) reached - nothing to warn about.
             return False
 
-        if len(hist) < ACCELERATION_WINDOW_SIZE:
-            # Not enough data yet to judge whether the plane is still accelerating.
-            return False
+        # if len(hist) < ACCELERATION_WINDOW_SIZE:
+        #     # Not enough data yet to judge whether the plane is still accelerating.
+        #     return False
 
         # Mean acceleration over a sliding window of the most recent history entries,
         # to smooth out noisy telemetry.

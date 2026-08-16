@@ -138,9 +138,11 @@ class AircraftStatusDock(QDockWidget):
         
         self.setWidget(main_widget)
         
-        self.__gear_hist = ValueHistory(5)
-        self.__flap_hist = ValueHistory(5)
-        self.__breaking_flap_hist = ValueHistory(5)
+        HistoryLength = 10
+        
+        self.__gear_hist = ValueHistory(HistoryLength)
+        self.__flap_hist = ValueHistory(HistoryLength)
+        self.__breaking_flap_hist = ValueHistory(HistoryLength)
     
     @Slot(str)
     def on_no_plane(self, message:str):
@@ -182,6 +184,7 @@ class AircraftStatusDock(QDockWidget):
         self._flap_status_information.set_state(current_flap_state, current_flap_aim)
         
         self.__gear_hist.add(new_telemetry.gear)
+        
         self.__flap_hist.add(new_telemetry.flaps.current)
         
         if new_telemetry.airbrake is not None:

@@ -71,16 +71,17 @@ class Lamp(QWidget):
         if not isinstance(state, LampState):
             state = LampState.ON if state else LampState.OFF
 
-        self.state = state
+        
+        if self.state != state:
+            self.state = state
+            if state == LampState.BLINKING or (state == LampState.ALERT and self.alert_blinking):
+                self._blink_on = True
+                self._restart_blink_timer()
+            else:
+                self._blink_timer.stop()
+                self._blink_on = True
 
-        if state == LampState.BLINKING or (state == LampState.ALERT and self.alert_blinking):
-            self._blink_on = True
-            self._restart_blink_timer()
-        else:
-            self._blink_timer.stop()
-            self._blink_on = True
-
-        self.update()
+            self.update()
 
     def _restart_blink_timer(self):
         on_ms = self.blink_interval * self.blink_ratio
