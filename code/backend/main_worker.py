@@ -5,10 +5,9 @@ Läuft in einem eigenen QThread neben dem GUI-Thread, wird einmalig erzeugt/gest
 und arbeitet danach periodisch mit einer zur Laufzeit einstellbaren Frequenz.
 
 Bewusst eigenständig gehalten: importiert nur Packages/backend-Bausteine, die
-schon vorher isoliert waren (TelemetryFetcher, Plane). Es gibt noch KEINE
-Verbindung zu MainWindow, SettingsWindow oder PlaneSpeedWarningEngine - die
-Integrationspunkte sind unten als TODOs markiert und füllen wir als nächstes
-gemeinsam.
+schon vorher isoliert waren (TelemetryFetcher, Plane). Ist über S_NewPlane /
+S_TelUpdate / S_NoPlane mit MainWindow, der AcousticInformationEngine und den
+Dock-Widgets verbunden (siehe gui/main_window.py).
 """
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 import threading
@@ -213,20 +212,3 @@ class MainWorker(QObject):
         else:
             self._current_plane.update_telemetry(telemetry)
             self.S_TelUpdate.emit(self._current_plane)
-
-
-# ---- TODO Integration (nächster gemeinsamer Schritt) ----
-# - MainWindow: eine MainWorker-Instanz statt PlaneUpdateWorker erzeugen und
-#   worker.start() beim Start aufrufen.
-# - S_NewPlane / S_TelUpdate: an alles anbinden, was bisher new_plane_data /
-#   new_telemetry_data von PlaneUpdateWorker gehört hat. Achtung: die
-#   PlaneSpeedWarningEngine erwartet aktuell in on_new_telemetry ein
-#   TelemetryData-Objekt, kein Plane -- Signatur dort ggf. anpassen
-#   (plane.telemetry liegt ja schon vor).
-# - S_NoPlane: neuer Signalpfad ohne Entsprechung im alten Code -- z.B. um GUI-
-#   Anzeigen ("Kein Flugzeug erkannt") zurückzusetzen. Dafür existiert aktuell
-#   noch kein Handler.
-# - set_interval() / set_endpoint_ip(): an SettingsWindow.general_settings_changed
-#   anbinden (ersetzt MainWindow._on_general_settings_change's fetcher_worker-Neustart).
-# - Nach erfolgreicher Anbindung: backend/worker.py (AsyncPeriodicWorker,
-#   PlaneUpdateWorker) entfernen, MainWorker übernimmt deren Rolle vollständig.
