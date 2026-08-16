@@ -159,7 +159,7 @@ def find_AAAs(friendly=True):
     print('')
     
 def get_usefull_information(telem:telemetry.TelemInterface) -> dict:
-    relevant_keys = ["IAS", "airframe", "altitude", "heading", "lat", "lon", "airbrake, %", 'gearState','flaps, %']
+    relevant_keys = ["IAS", "airframe", "altitude", "heading", "lat", "lon", "airbrake, %", 'gearState','flaps, %','wing_sweep_lever', 'wing_sweep_indicator']
     relevant_key_parts = []
     
     result_dict = {}
@@ -193,15 +193,15 @@ if __name__ == '__main__':
         while not telem.get_telemetry():
             time.sleep(0.1)
         
-        find_map_info()
-        find_all_airfields()
-        find_all_planes()
-        find_all_tanks()
-        find_all_bomb_points()
-        find_all_AAAs()
-        find_basic_telemetry()
-        find_comments()
-        find_events()
+        # find_map_info()
+        # find_all_airfields()
+        # find_all_planes()
+        # find_all_tanks()
+        # find_all_bomb_points()
+        # find_all_AAAs()
+        # find_basic_telemetry()
+        # find_comments()
+        # find_events()
         
     except KeyboardInterrupt:
         print('Closing')
@@ -212,17 +212,18 @@ if __name__ == '__main__':
         
         
     if not error:
-        with open("f-80a.txt","a+") as file:
-            while True:
-                try:
-                    telem.get_telemetry()
-                    # find_basic_telemetry()
-                    # find_full_telemetry()
-                    pprint(get_usefull_information(telem))
-                    file.write(str({"Full": telem.full_telemetry, "Basic":telem.basic_telemetry}))
-                    file.write("\n")
-                    time.sleep(.5)
-                except Exception as e:
-                    print('Error: {}'.format(e))
-                    break
+        with open("tornado.txt","a+") as file:
+            pass 
+            # while True:
+            #     try:
+            #         telem.get_telemetry()
+            #         # find_basic_telemetry()
+            #         # find_full_telemetry()
+            #         pprint(get_usefull_information(telem))
+            #         file.write(str({"Full": telem.full_telemetry, "Basic":telem.basic_telemetry}))
+            #         file.write("\n")
+            #         time.sleep(.5)
+            #     except Exception as e:
+            #         print('Error: {}'.format(e))
+            #         break
             

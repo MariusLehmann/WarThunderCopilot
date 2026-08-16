@@ -1,6 +1,40 @@
 from dataclasses import dataclass
 import requests
-
+from wt_dataclasses import SpeedLimit, PlaneProperties, GeneralSpeedLimits
+  
+@dataclass
+class APIReturnedPlane:
+    planetype: str
+    planename: str
+    frame_max: SpeedLimit
+    gear_max: SpeedLimit
+    combat_max: int | None
+    start_max: int | None
+    landing_max: int | None
+    mach_limit: SpeedLimit
+    
+    def __post_init__(self):
+        # Ensure that the speed limits are instances of SpeedLimit
+        if not isinstance(self.frame_max, SpeedLimit):
+            self.frame_max = SpeedLimit(**self.frame_max)
+        if not isinstance(self.gear_max, SpeedLimit):
+            self.gear_max = SpeedLimit(**self.gear_max)
+        if not isinstance(self.mach_limit, SpeedLimit):
+            self.mach_limit = SpeedLimit(**self.mach_limit)
+    
+    def to_plane_properties(self) -> PlaneProperties:
+        return PlaneProperties(
+            planetype=self.planetype,
+            planename=self.planename,
+            speed_limits=GeneralSpeedLimits(
+                gear=self.gear_max,
+                frame=self.frame_max,
+                frame_mach=self.mach_limit,
+                combat_flap=self.combat_max,
+                start_flap=self.start_max,
+                landing_flap=self.landing_max
+            )
+        )
 
 class PlaneNotFound(Exception):
     def __init__(self, plane_type):
@@ -10,6 +44,27 @@ class PlaneNotFound(Exception):
 class APIConnectionError(ConnectionError):
     pass
 
+class BackendAPIConnection: 
+    def __init__(self, base_url="https://api.wtc.mariuslehmann.de/wtc/plane/"):
+        self.base_url = base_url
+        
+    def get_plane(self, plane_type: str) -> PlaneProperties:
+        response = requests.get(f"{self.base_url}{plane_type}")
+        try:
+            response.raise_for_status()  # Raise an exception for bad status codes
+        except requests.exceptions.HTTPError as e:
+            if response.status_code == 404:
+                raise PlaneNotFound(plane_type) from e
+            else:
+                raise APIConnectionError(f"API error: {e}") from e
+        except requests.exceptions.ConnectionError as e:
+            raise APIConnectionError(f"Network error: {e}") from e
+        
+        data = response.json()
+        
+        plane = APIReturnedPlane(**data)
+        
+        return plane.to_plane_properties()
 
 @dataclass
 class DBPlane:

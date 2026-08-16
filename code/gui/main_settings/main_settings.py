@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                QTabWidget, QPushButton, QWidget, QMessageBox,
                                QLineEdit, QLabel, QComboBox, QFormLayout)
 from PySide6.QtCore import Signal, Qt
-from backend.settings import GlobalSettings, GeneralSettings, WarningSettings
+from backend.settings import GlobalSettings, GeneralSettings, WarningSettings, SoundSettings
 from Packages.local_db import LocalDB
 from Packages.settings_collection import SettingsCollection
 from .warning_settings import WarningSettingsTab
@@ -42,20 +42,25 @@ class SettingsWindow(QDialog):
     _changes_detected: bool = False
     _original_settings: GlobalSettings
     _settings_obj: GlobalSettings
-    
+
+    # Reihenfolge der Tabs, wie sie in _init_ui angelegt werden.
+    TAB_GENERAL = 0
+    TAB_WARNINGS = 1
+    TAB_SOUNDS = 2
+
     # Signals
     general_settings_changed = Signal(GeneralSettings)
     warning_settings_changed = Signal(WarningSettings)
-    sound_settings_changed = Signal()  # TODO: SoundSettings mit übergeben
+    sound_settings_changed = Signal(SoundSettings)
     settings_saved = Signal(object)  # Signal wird mit Settings-Objekt emittiert
-    
-    
-    def __init__(self, parent=None, settings=None):
+
+
+    def __init__(self, parent=None, settings=None, initial_tab: int = TAB_GENERAL):
         super().__init__(parent)
         self.setWindowTitle("Einstellungen")
         self.setModal(True)
         self.resize(600, 400)
-        
+
         # Original Settings für Änderungserkennung
         if isinstance(settings, GlobalSettings):
             self._original_settings = settings
@@ -63,18 +68,28 @@ class SettingsWindow(QDialog):
             self._original_settings = GlobalSettings.from_settingsCollection(settings)
         else:
             raise ValueError("Ungültiger Typ für Einstellungen")
-        
+
         self._init_ui()
         self._load_settings()
+        self.tab_widget.setCurrentIndex(initial_tab)
         
     def _load_settings(self):
         """Lädt gespeicherte Einstellungen in die UI-Elemente.
         """
         db = LocalDB()
         self._settings_obj = GlobalSettings.from_dict(db.get_global_settings())
-        
+
         self.general_tab.load_settings(self._settings_obj.general)
         self.warnings_tab.load_settings(self._settings_obj.warning)
+        self.sounds_tab.load_settings(self._settings_obj.sounds)
+
+        # Der Sounds-Tab normalisiert seine Werte beim Laden (z.B. fehlende
+        # Einträge werden mit Default-SoundProperties aufgefüllt). Damit die
+        # Änderungserkennung in _changes_present() nicht sofort "Änderungen"
+        # meldet, obwohl der Nutzer nichts angefasst hat, wird _original_settings
+        # aus dem tatsächlich geladenen UI-Zustand neu berechnet statt aus dem
+        # rohen (ggf. abweichend strukturierten) gespeicherten Dict.
+        self._original_settings = self._collect_settings()
 
         return
     
@@ -162,7 +177,7 @@ class SettingsWindow(QDialog):
         settings = GlobalSettings(
             general=self.general_tab.get_settings(),
             warning=self.warnings_tab.get_settings(),
-            # sound=None  # TODO: Sound settings in den RAM kopieren
+            sound=self.sounds_tab.get_settings()
         )
         self._settings_obj = settings
         return settings
@@ -192,7 +207,8 @@ class SettingsWindow(QDialog):
                 self.warning_settings_changed.emit(self._settings_obj.warning)
             
             if self.sounds_tab.has_changes():
-                self.sound_settings_changed.emit()
+                self.sounds_tab.save_changes()
+                self.sound_settings_changed.emit(self._settings_obj.sounds)
             return True
         return False
     
