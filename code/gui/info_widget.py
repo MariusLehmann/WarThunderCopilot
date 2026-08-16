@@ -78,28 +78,28 @@ class InfoDockWidget(QDockWidget):
                 
                 rows += f"<tr>{key_cell}{val_cell}</tr>"            
 
-                if rows == "":
-                    table_html = f"<div style='margin-top:6px;color:{text_color}'>Keine Geschwindigkeitsdaten verfügbar</div>"
-                else:
-                    table_html = f"""
-                    <table style='border-collapse:collapse;margin-top:6px;border:1px solid #ddd;color:{text_color}'>
-                        <tbody>
-                            {rows}
-                        </tbody>
-                    </table>
-                    """
-    
-                # Gesamtes HTML mit vergrößerter Schrift und fettem "Max Speeds"
-                html = f"""
-                <div style='font-size:{new_pt}pt; font-family:\"{font_family}\"; color:{text_color};'>
-                    <div style='font-weight:bold; margin-bottom:6px;'>{plane_type}</div>
-                    <div style='font-weight:bold; margin-top:8px;'>Max Speeds:</div>
-                    {table_html}
-                </div>
+            if rows == "":
+                table_html = f"<div style='margin-top:6px;color:{text_color}'>Keine Geschwindigkeitsdaten verfügbar</div>"
+            else:
+                table_html = f"""
+                <table style='border-collapse:collapse;margin-top:6px;border:1px solid #ddd;color:{text_color}'>
+                    <tbody>
+                        {rows}
+                    </tbody>
+                </table>
                 """
-    
-                self.info_label.setTextFormat(Qt.TextFormat.RichText)
-                self.info_label.setText(html)
+
+            # Gesamtes HTML mit vergrößerter Schrift und fettem "Max Speeds"
+            html = f"""
+            <div style='font-size:{new_pt}pt; font-family:\"{font_family}\"; color:{text_color};'>
+                <div style='font-weight:bold; margin-bottom:6px;'>{plane_type}</div>
+                <div style='font-weight:bold; margin-top:8px;'>Max Speeds:</div>
+                {table_html}
+            </div>
+            """
+
+            self.info_label.setTextFormat(Qt.TextFormat.RichText)
+            self.info_label.setText(html)
         else:
             self.info_label.setText("No Plane Information avaliable yet")
     

@@ -82,7 +82,7 @@ class GlobalSettings(object):
         return {
             "general": self.general.to_dict(),
             "warning": self.warning.__dict__,
-            "sounds": self.sounds.__dict__,
+            "sounds": self.sounds.to_dict(),
         }
         
     def __eq__(self, value: object) -> bool:
@@ -97,7 +97,7 @@ class GlobalSettings(object):
         
         settings.general = GeneralSettings(**data.get("general", {}))
         settings.warning = WarningSettings(**data.get("warning", {}))
-        settings.sounds = SoundSettings(**data.get("sounds", {}))
+        settings.sounds = SoundSettings.from_dict(data.get("sounds", {}))
         return settings
     
     @classmethod

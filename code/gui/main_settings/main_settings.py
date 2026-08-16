@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout,
                                QTabWidget, QPushButton, QWidget, QMessageBox,
                                QLineEdit, QLabel, QComboBox, QFormLayout)
 from PySide6.QtCore import Signal, Qt
-from backend.settings import GlobalSettings, GeneralSettings, WarningSettings
+from backend.settings import GlobalSettings, GeneralSettings, WarningSettings, SoundSettings
 from Packages.local_db import LocalDB
 from Packages.settings_collection import SettingsCollection
 from .warning_settings import WarningSettingsTab
@@ -51,7 +51,7 @@ class SettingsWindow(QDialog):
     # Signals
     general_settings_changed = Signal(GeneralSettings)
     warning_settings_changed = Signal(WarningSettings)
-    sound_settings_changed = Signal()  # TODO: SoundSettings mit übergeben
+    sound_settings_changed = Signal(SoundSettings)
     settings_saved = Signal(object)  # Signal wird mit Settings-Objekt emittiert
 
 
@@ -78,9 +78,18 @@ class SettingsWindow(QDialog):
         """
         db = LocalDB()
         self._settings_obj = GlobalSettings.from_dict(db.get_global_settings())
-        
+
         self.general_tab.load_settings(self._settings_obj.general)
         self.warnings_tab.load_settings(self._settings_obj.warning)
+        self.sounds_tab.load_settings(self._settings_obj.sounds)
+
+        # Der Sounds-Tab normalisiert seine Werte beim Laden (z.B. fehlende
+        # Einträge werden mit Default-SoundProperties aufgefüllt). Damit die
+        # Änderungserkennung in _changes_present() nicht sofort "Änderungen"
+        # meldet, obwohl der Nutzer nichts angefasst hat, wird _original_settings
+        # aus dem tatsächlich geladenen UI-Zustand neu berechnet statt aus dem
+        # rohen (ggf. abweichend strukturierten) gespeicherten Dict.
+        self._original_settings = self._collect_settings()
 
         return
     
@@ -199,7 +208,7 @@ class SettingsWindow(QDialog):
             
             if self.sounds_tab.has_changes():
                 self.sounds_tab.save_changes()
-                self.sound_settings_changed.emit()
+                self.sound_settings_changed.emit(self._settings_obj.sounds)
             return True
         return False
     

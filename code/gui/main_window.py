@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
         settings_window.settings_saved.connect(self._on_settings_saved)
         settings_window.general_settings_changed.connect(self._on_general_settings_change)
         settings_window.warning_settings_changed.connect(self._information_engine.on_new_warning_settings)
-        # settings_window.sound_settings_changed.connect(self._reload_sound_settings)
+        settings_window.sound_settings_changed.connect(self._sound_engine.on_new_sound_settings)
 
         self._pause_all_workers()
         settings_window.exec()
@@ -243,11 +243,6 @@ class MainWindow(QMainWindow):
         :param settings: New GlobalSettings Oject
         """
         self._global_settings = settings
-        
-    # def _reload_sound_settings(self):
-    #     """Reload sound/volume mappings for the main sound players after sound settings changed."""
-    #     self._default_sound_box.reload_sound_settings()
-    #     self._priority_sound_box.reload_sound_settings()
 
     def _pause_all_workers(self):
         """Pause all periodic workers or tasks found to self.periodic_workers
