@@ -98,16 +98,18 @@ jobs:
           url = f'https://api.github.com/repos/{repo}/tags'
           r = requests.get(url, headers=headers)
           r.raise_for_status()
-          tags = [t['name'] for t in r.json() if t['name'].startswith(base_tag)]
+          existing_tags = {t['name'] for t in r.json()}
 
-          if tags:
-              # Unterversion bestimmen
-              suffix = 1
-              while f"{base_tag}.{suffix}" in tags:
-                  suffix += 1
-              final_tag = f"{base_tag}.{suffix}"
-          else:
-              final_tag = base_tag
+          # Gegen den tatsächlich verwendeten Tag-Namen prüfen, nicht nur
+          # gegen das Datum ohne Suffix - sonst kollidiert die Prüfung nie mit
+          # bereits vergebenen Tags und überschreibt vorhandene Releases.
+          def candidate(n):
+              return base_tag if n == 0 else f"{base_tag}.{n}"
+
+          suffix = 0
+          while candidate(suffix) in existing_tags:
+              suffix += 1
+          final_tag = candidate(suffix)
 
           print(f"TAG_NAME={final_tag}")
           with open(os.environ['GITHUB_ENV'], 'a') as f:
