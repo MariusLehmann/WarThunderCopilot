@@ -55,7 +55,7 @@ class SpeedLimit:
     
 @dataclass
 class CurrentFlapState:
-    aim: int
+    aim: int | None
     current: int
     
 @dataclass

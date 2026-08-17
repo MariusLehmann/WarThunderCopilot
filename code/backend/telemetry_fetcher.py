@@ -10,12 +10,12 @@ from wt_dataclasses import CurrentFlapState, TelemetryData
 class ParsedTelemetryData:
     planetype: str
     flapState: int
-    flapsAim: int
     gear: int
     ias: int
     lat: float = 0
     lon: float = 0
     mach_speed: float = 999.9
+    flapsAim: int | None = None
     airbrake: int | None = None
     sweep_lever: int | None = None
     sweep_indicator: int | None = None
@@ -50,6 +50,7 @@ TELEMETRY_INFORMATION = {
     
 OPTIONAL_TELEMETRY = [
     "airbrake",
+    "flapsAim",
     "lat",
     "lon", 
     "mach_speed",

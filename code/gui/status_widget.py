@@ -51,7 +51,7 @@ class FlapsStatusDisplay(QWidget):
             self._layout.addWidget(lbl)
             self.labels.append(lbl)
 
-    def set_state(self, new_state: FlapState, new_aim_state: FlapState): # TODO: Implement usage of Aim Level
+    def set_state(self, new_state: FlapState, new_aim_state: FlapState | None): # TODO: Implement usage of Aim Level
         self.current_state = new_state
         
         for lbl in self.labels:
@@ -170,7 +170,7 @@ class AircraftStatusDock(QDockWidget):
     def on_new_telemetry(self, updated_plane:Plane):
         new_telemetry = updated_plane.telemetry
         
-        current_flap_aim = self.__get_flap_state_by_deployed_perc(updated_plane, new_telemetry.flaps.aim)
+        current_flap_aim = self.__get_flap_state_by_deployed_perc(updated_plane, new_telemetry.flaps.aim) if new_telemetry.flaps.aim is not None else None
         current_flap_state = self.__get_flap_state_by_deployed_perc(updated_plane, new_telemetry.flaps.current)
         
         safe_flap_state = FlapState.NONE
