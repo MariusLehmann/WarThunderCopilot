@@ -94,7 +94,6 @@ class MechanicalState(Enum):
     MOVING = 1
     DEPLOYED = 2        
 
-# TODO: build support for Planes Withount Brake-Flaps
 class AircraftStatusDock(QDockWidget):
     """AircraftStatus Dock Widget to be used in the main Window if activated"""
     _main_layout: QHBoxLayout
@@ -143,6 +142,8 @@ class AircraftStatusDock(QDockWidget):
         self.__gear_hist = ValueHistory(HistoryLength)
         self.__flap_hist = ValueHistory(HistoryLength)
         self.__breaking_flap_hist = ValueHistory(HistoryLength)
+        
+        self.__has_airbrake = True
     
     @Slot(str)
     def on_no_plane(self, message:str):
@@ -154,11 +155,15 @@ class AircraftStatusDock(QDockWidget):
 
     @Slot(Plane)
     def on_new_plane(self, updated_plane:Plane):
+        self.__has_airbrake = updated_plane.telemetry.airbrake is not None
         # FlapState.NONE hat keinen Eintrag in FlapStateDisplayText und wird
         # nicht als eigenes, wählbares Klappen-Label angezeigt.
         possible_states = [possible.name for possible in updated_plane.flaps.possible
                             if possible.name != FlapState.NONE]
         self._flap_status_information.set_states(possible_states)
+        
+        self.__lamps["brake_flaps"].setVisible(self.__has_airbrake) # hide Airbrake Lamp if plane has none
+        
         self.on_new_telemetry(updated_plane)
 
     @Slot(Plane)
@@ -189,7 +194,7 @@ class AircraftStatusDock(QDockWidget):
         
         if new_telemetry.airbrake is not None:
             self.__breaking_flap_hist.add(new_telemetry.airbrake)
-            
+
         if self.__gear_hist.current > 0:
             if self.__gear_hist.is_accelerating or self.__gear_hist.is_decelerating:
                 self.__lamps["landing_gear"].set_state(LampState.BLINKING)
@@ -206,7 +211,7 @@ class AircraftStatusDock(QDockWidget):
         else: 
             self.__lamps["flaps"].set_state(LampState.OFF)
                     
-        if new_telemetry.airbrake is not None:
+        if new_telemetry.airbrake is not None and self.__has_airbrake:
             if self.__breaking_flap_hist.current > 0:
                 if self.__breaking_flap_hist.is_accelerating or self.__breaking_flap_hist.is_decelerating:
                     self.__lamps["brake_flaps"].set_state(LampState.BLINKING)

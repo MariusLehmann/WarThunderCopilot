@@ -15,8 +15,8 @@ class ParsedTelemetryData:
     ias: int
     lat: float = 0
     lon: float = 0
-    airbrake: int = 0
     mach_speed: float = 999.9
+    airbrake: int | None = None
     sweep_lever: int | None = None
     sweep_indicator: int | None = None
         

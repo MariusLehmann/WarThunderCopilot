@@ -66,8 +66,8 @@ class TelemetryData:
     ias: int
     lat: float = 0
     lon: float = 0
-    airbrake: int = 0
     mach_speed: float = 999.9
+    airbrake: int | None = None
     wing_sweep_lever: int | None = None
     wing_sweep_indicator: int | None = None
     
