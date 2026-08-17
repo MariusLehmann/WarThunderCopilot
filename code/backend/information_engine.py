@@ -6,7 +6,7 @@ from .settings import WarningSettings, GlobalSettings
 
 from Packages.local_db import LocalDB
 from Models import Plane
-from wt_dataclasses import FlapState, GENERAL_FLAP_STATES
+from wt_dataclasses import FlapState
 from backend.SoundEngine import WT_Sound
 
 SPEED_HISTORY_LENGTH = 50  # Number of recent speed differences to keep for threshold checks
@@ -28,7 +28,7 @@ class CurrentPlaneThresholds:
     frame: SpeedThreshold
     frame_mach: SpeedThreshold | None 
     
-    flaps: dict[str, SpeedThreshold] = field(default_factory=lambda: {state.value: SpeedThreshold(float('inf'), WarningSettings()) for state in GENERAL_FLAP_STATES})
+    flaps: dict[str, SpeedThreshold] = field(default_factory=dict)
 
 class AcousticInformationEngine(QObject):
     # Signals
@@ -184,18 +184,18 @@ class AcousticInformationEngine(QObject):
         
         gear_thresh = SpeedThreshold(basic_limits.gear, self._warning_settings)
         frame_thresh = SpeedThreshold(basic_limits.frame, self._warning_settings)
-        frame_mach_thresh = SpeedThreshold(basic_limits.frame_mach, self._warning_settings, speed_in_mach=True) if basic_limits.frame_mach is not None else SpeedThreshold(float('inf'), self._warning_settings, speed_in_mach=True)
-        
-        combat_flap_tresh = SpeedThreshold(basic_limits.combat_flap, self._warning_settings) if basic_limits.combat_flap is not None else SpeedThreshold(float('inf'), self._warning_settings)
-        start_flap_tresh = SpeedThreshold(basic_limits.start_flap, self._warning_settings) if basic_limits.start_flap is not None else SpeedThreshold(float('inf'), self._warning_settings)
-        landing_flap_tresh = SpeedThreshold(basic_limits.landing_flap, self._warning_settings) if basic_limits.landing_flap is not None else SpeedThreshold(float('inf'), self._warning_settings)
+        frame_mach_thresh = SpeedThreshold(basic_limits.frame_mach, self._warning_settings, speed_in_mach=True) if basic_limits.frame_mach is not None else None
 
-        flap_thresholds = {
-            FlapState.COMBAT.value: combat_flap_tresh,
-            FlapState.START.value: start_flap_tresh,
-            FlapState.LANDING.value: landing_flap_tresh
+        flap_limits = {
+            FlapState.COMBAT.value: basic_limits.combat_flap,
+            FlapState.START.value: basic_limits.start_flap,
+            FlapState.LANDING.value: basic_limits.landing_flap
         }
-        
+        flap_thresholds = {
+            state: SpeedThreshold(limit, self._warning_settings)
+            for state, limit in flap_limits.items() if limit is not None
+        }
+
         self._current_thresholds= CurrentPlaneThresholds(
             gear=gear_thresh,
             frame=frame_thresh,
@@ -203,21 +203,6 @@ class AcousticInformationEngine(QObject):
             flaps=flap_thresholds
         )
 
-    def _get_safe_flap_state(self) -> str:
-        """Determine the safe flap state based on the current speed and thresholds."""
-        assert self._current_thresholds is not None, "Current thresholds should not be None when determining safe flap state."
-        if self._plane is None:
-            raise ValueError("No current plane to determine safe flap state for.")
-        
-        current_speed = self._plane.telemetry.ias
-        
-        for flap_state in self._plane.flaps.possible[::-1]:  # Check from most deployed to least
-            if flap_state.name == FlapState.NONE:
-                return FlapState.NONE.value
-            if current_speed < self._current_thresholds.flaps.get(flap_state.name.value, SpeedThreshold(float('inf'), self._warning_settings)).warning_speed:
-                return flap_state.name.value
-        return FlapState.NONE.value  # Default to NONE if no other state is safe
-    
     def __get_safe_flap_state(self) -> FlapState:
         if self._current_thresholds is None or self._plane is None:
             return FlapState.NONE
