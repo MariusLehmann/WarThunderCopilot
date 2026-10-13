@@ -83,3 +83,8 @@ def configure_logging():
 		# if we cannot create the directory, fall back to current working dir
 		pass
 	logging.config.dictConfig(LOGGING)
+ 
+# -------------------------------------------------------------------------------
+# Connection Settings
+# -------------------------------------------------------------------------------
+GENERAL_TIMEOUT = 5  # seconds

@@ -202,11 +202,12 @@ class MainWorker(QObject):
 
         self._reset_error_backoff()
 
-        if self._current_plane is None or self._current_plane.planetype != telemetry.planetype:
+        if self._current_plane is None or self._current_plane.planetype != telemetry.planetype.lower():
             try:
                 self._current_plane = Plane(telemetry)
             except PlaneFetchError as e:
                 self.S_NoPlane.emit(str(e))
+                self._current_plane = None
                 return
             self.S_NewPlane.emit(self._current_plane)
         else:

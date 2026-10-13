@@ -85,6 +85,7 @@ class TelemetryFetcher(object):
                 self.tel_interface.get_telemetry()
                 self.__update_telemetry()
             except Exception as e:
+                self.telemetry = None
                 print(f"Error while fetching: {e}")
                 
         else:
@@ -100,6 +101,7 @@ class TelemetryFetcher(object):
    
     def __update_telemetry(self) -> None:
         if not self.tel_interface.basic_telemetry and not self.tel_interface.full_telemetry:
+            self.telemetry = None
             raise PlaneNotFoundException("No Plane Found.")
         
         

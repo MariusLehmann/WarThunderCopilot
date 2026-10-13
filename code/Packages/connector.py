@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 import requests
 from wt_dataclasses import SpeedLimit, PlaneProperties, GeneralSpeedLimits
-  
+
+from settings import GENERAL_TIMEOUT
+
 @dataclass
 class APIReturnedPlane:
     planetype: str
@@ -49,8 +51,8 @@ class BackendAPIConnection:
         self.base_url = base_url
         
     def get_plane(self, plane_type: str) -> PlaneProperties:
-        response = requests.get(f"{self.base_url}{plane_type}")
         try:
+            response = requests.get(f"{self.base_url}{plane_type}", timeout=GENERAL_TIMEOUT)
             response.raise_for_status()  # Raise an exception for bad status codes
         except requests.exceptions.HTTPError as e:
             if response.status_code == 404:
@@ -59,8 +61,14 @@ class BackendAPIConnection:
                 raise APIConnectionError(f"API error: {e}") from e
         except requests.exceptions.ConnectionError as e:
             raise APIConnectionError(f"Network error: {e}") from e
-        
-        data = response.json()
+        except requests.RequestException as e:
+            raise APIConnectionError(f"Request error: {e}") from e
+        try:
+            data = response.json()
+        except ValueError as e:
+            raise APIConnectionError(f"Invalid JSON response: {e}") from e
+        except TypeError as e:
+            raise APIConnectionError(f"Unexpected response format: {e}") from e
         
         plane = APIReturnedPlane(**data)
         
@@ -99,7 +107,7 @@ class APIConnection:
         :return: Plane Data
         :rtype: DBPlane
         """
-        response = requests.get(f"{self.base_url}{plane_id}")
+        response = requests.get(f"{self.base_url}{plane_id}", timeout=GENERAL_TIMEOUT)
         try:
             response.raise_for_status() # Raise an exception for bad status codes
         except requests.exceptions.HTTPError as e:
